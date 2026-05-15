@@ -464,3 +464,65 @@
     flex: 1;
     min-width: 90px;
 }
+
+/* 
+====================================================================
+   UI 정리 - 따뜻한 톤 유지 + 시각적 노이즈 감소 (점선은 유지)
+==================================================================== */
+
+/* 섹션 구분선 - 너무 진하지 않게 */
+.dynamic-sprites-settings hr {
+    border-top: 1px solid rgba(180, 150, 110, 0.18) !important;
+    margin: 18px 0 !important;
+}
+
+/* 섹션 간격 여유 */
+.dynamic-sprites-settings .ds-section {
+    margin-bottom: 16px;
+}
+
+/* placeholder 텍스트 흐리게 - 시각 노이즈 줄임 */
+.dynamic-sprites-settings input::placeholder,
+.dynamic-sprites-settings textarea::placeholder {
+    opacity: 0.4 !important;
+    font-size: 0.85em;
+}
+
+/* 감정 카드 배경 살짝 - 카드 구분 명확하게 */
+.ds-emotion-item {
+    background: rgba(180, 150, 110, 0.05) !important;
+    padding: 10px !important;
+}
+
+/* 활성 캐릭터 아코디언 - 따뜻한 강조색 */
+.ds-char-accordion.ds-current {
+    background: rgba(200, 150, 90, 0.05) !important;
+}
+
+.ds-char-accordion.ds-current .ds-char-header {
+    background: rgba(200, 150, 90, 0.08);
+}
+
+/* 사용 횟수 뱃지 - 파랑 → 따뜻한 갈색 톤으로 */
+.ds-usage-badge {
+    background: rgba(180, 130, 80, 0.15) !important;
+    color: rgba(140, 100, 60, 0.9) !important;
+}
+
+.ds-usage-badge.ds-usage-zero {
+    background: rgba(180, 150, 110, 0.08) !important;
+    color: rgba(140, 110, 80, 0.5) !important;
+}
+
+/* h4 헤더 - 따뜻한 강조 */
+.dynamic-sprites-settings h4 {
+    color: rgba(120, 85, 50, 0.95);
+    font-weight: 600;
+}
+
+/* 힌트 박스 (파란 줄 박스) - 따뜻한 톤으로 통일 */
+#ds-api-st-hint {
+    background: rgba(200, 150, 90, 0.08) !important;
+    border-left: 3px solid rgba(200, 150, 90, 0.5) !important;
+    color: rgba(120, 85, 50, 0.9);
+}
