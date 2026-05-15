@@ -146,20 +146,34 @@ function applyDisplayStyles() {
         document.head.appendChild(styleEl);
     }
 
-    const buildPositionCSS = (pos, offsetX, offsetY) => {
-        let css = `bottom: ${offsetY}px;`;
+    // 모바일 ST에서 bottom 좌표가 깨지는 환경이 있어서, top 기반으로 계산
+    // (높이 % → 픽셀로 변환하고, 위에서부터 위치 잡음)
+    const buildPositionCSS = (pos, offsetX, offsetY, heightVh) => {
+        // bottom 대신 top 사용: viewport 높이 - 컨테이너 높이 - offsetY = top 좌표
+        const topCalc = `calc(100vh - ${heightVh}vh - ${offsetY}px)`;
+        let css = `top: ${topCalc}; bottom: auto;`;
         if (pos === "bottom-left") {
             css += ` left: ${offsetX}px; right: auto; transform: none;`;
         } else if (pos === "bottom-right") {
-            css += ` right: ${offsetX}px; left: auto; transform: none;`;
+            css += ` left: auto; right: ${offsetX}px; transform: none;`;
         } else if (pos === "bottom-center") {
             css += ` left: 50%; right: auto; transform: translateX(-50%);`;
         }
         return css;
     };
 
-    const desktopPos = buildPositionCSS(settings.desktopPosition, settings.desktopOffsetX, settings.desktopOffsetY);
-    const mobilePos = buildPositionCSS(settings.mobilePosition, settings.mobileOffsetX, settings.mobileOffsetY);
+    const desktopPos = buildPositionCSS(
+        settings.desktopPosition,
+        settings.desktopOffsetX,
+        settings.desktopOffsetY,
+        settings.desktopHeight
+    );
+    const mobilePos = buildPositionCSS(
+        settings.mobilePosition,
+        settings.mobileOffsetX,
+        settings.mobileOffsetY,
+        settings.mobileHeight
+    );
 
     styleEl.textContent = `
         #dynamic-sprite-container {
