@@ -41,11 +41,21 @@ const defaultSettings = {
     // === 표시 설정 프리셋 (이름 → 설정 스냅샷) ===
     displayPresets: {},
 
+    // === 사용자 정의 감정 별칭 ===
+    // { "synonymWord": "canonicalLabel" } 형식
+    // 예: { "ecstatic": "happy" } → AI가 "ecstatic" 뱉으면 "happy" 라벨로 매칭
+    userAliases: {},
+
     // === origin 백업 (이미지 base64) - 자동복구용 ===
     // 키: imageKey → 값: base64 dataURL
     // 새 origin에서 IndexedDB 비어있으면 여기서 자동 복원
     imageBackup: {},
     autoBackup: true, // 이미지 업로드 시 자동으로 imageBackup에 백업
+
+    // === 이미지 자동 압축 ===
+    autoCompress: true,
+    compressMaxDim: 800,    // px - 가장 긴 변 기준
+    compressQuality: 85,    // 1-100 (WebP quality)
 
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
     characters: {},
@@ -141,6 +151,94 @@ function createSpriteContainer() {
     container.id = "dynamic-sprite-container";
     container.innerHTML = `<img id="dynamic-sprite-img" alt="sprite">`;
     document.body.appendChild(container);
+
+    // 스프라이트 클릭 시 수동 감정 선택 메뉴
+    const img = container.querySelector("#dynamic-sprite-img");
+    img.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showManualEmotionPicker(e);
+    });
+}
+
+// ====================================================================
+// 수동 감정 선택 팝업
+// ====================================================================
+let manualPickerEl = null;
+function showManualEmotionPicker(event) {
+    const settings = extension_settings[extensionName];
+    const charName = getCurrentCharName();
+    if (!charName) return;
+    const charData = getCharData(charName);
+    if (charData.emotions.length === 0) return;
+
+    // 이미 떠있으면 닫기
+    if (manualPickerEl) {
+        manualPickerEl.remove();
+        manualPickerEl = null;
+        return;
+    }
+
+    const picker = document.createElement("div");
+    picker.id = "ds-manual-picker";
+    picker.innerHTML = `
+        <div class="ds-picker-header">
+            <span>감정 선택 — ${charName}</span>
+            <button class="ds-picker-close">✕</button>
+        </div>
+        <div class="ds-picker-grid">
+            ${charData.emotions.map(e => `
+                <button class="ds-picker-item ${e.label === charData.current ? "ds-picker-current" : ""}" data-label="${e.label}">
+                    <span class="ds-picker-label">${e.label}</span>
+                </button>
+            `).join("")}
+        </div>
+    `;
+    document.body.appendChild(picker);
+    manualPickerEl = picker;
+
+    // 팝업 위치: 스프라이트 위쪽에
+    const img = document.getElementById("dynamic-sprite-img");
+    const rect = img.getBoundingClientRect();
+    const pickerRect = picker.getBoundingClientRect();
+    let top = rect.top - pickerRect.height - 10;
+    let left = rect.left;
+    // 화면 위로 튀어나가면 아래로
+    if (top < 10) top = rect.bottom + 10;
+    // 화면 오른쪽 튀어나가면 조정
+    if (left + pickerRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - pickerRect.width - 10;
+    }
+    if (left < 10) left = 10;
+    picker.style.top = `${top}px`;
+    picker.style.left = `${left}px`;
+
+    // 이벤트
+    picker.querySelectorAll(".ds-picker-item").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const label = e.currentTarget.dataset.label;
+            updateSprite(label);
+            picker.remove();
+            manualPickerEl = null;
+        });
+    });
+    picker.querySelector(".ds-picker-close").addEventListener("click", (e) => {
+        e.stopPropagation();
+        picker.remove();
+        manualPickerEl = null;
+    });
+
+    // 바깥 클릭 시 닫기
+    setTimeout(() => {
+        const closeOnOutside = (ev) => {
+            if (!picker.contains(ev.target) && ev.target.id !== "dynamic-sprite-img") {
+                picker.remove();
+                manualPickerEl = null;
+                document.removeEventListener("click", closeOnOutside);
+            }
+        };
+        document.addEventListener("click", closeOnOutside);
+    }, 0);
 }
 
 // ====================================================================
@@ -287,6 +385,9 @@ async function updateSprite(emotionLabel) {
         }
 
         charData.current = emotion.label;
+        // 사용 횟수 카운트 (자동/수동 모두)
+        emotion.usageCount = (emotion.usageCount || 0) + 1;
+        emotion.lastUsedAt = Date.now();
         saveSettingsDebounced();
     } catch (err) {
         console.error("[DynamicSprite] 이미지 로드 실패:", err);
@@ -543,6 +644,37 @@ async function analyzeEmotion(messageText) {
             });
         }
 
+        // 4차: alias 매칭 — AI가 다른 단어를 뱉었어도 의미가 같으면 매핑
+        // 예: AI가 "furious"라고 했는데 등록된 라벨은 "angry"라면 angry로 매칭
+        if (!matched) {
+            const aliases = getEmotionAliases(); // { word: canonicalLabel }
+            // raw text에서 alias 단어 찾기
+            const lowerText = rawText.toLowerCase();
+            for (const aliasWord in aliases) {
+                const regex = new RegExp(`\\b${aliasWord}\\b`);
+                if (regex.test(lowerText)) {
+                    const canonical = aliases[aliasWord];
+                    // canonical 라벨로 등록된 감정 있나 확인
+                    matched = charData.emotions.find(e => e.label.toLowerCase() === canonical);
+                    if (matched) {
+                        console.log(`[DynamicSprite] alias 매핑: "${aliasWord}" → "${canonical}"`);
+                        break;
+                    }
+                    // canonical 없으면 그 단어가 가리키는 같은 그룹의 다른 alias도 시도
+                    for (const w in aliases) {
+                        if (aliases[w] === canonical && w !== aliasWord) {
+                            matched = charData.emotions.find(e => e.label.toLowerCase() === w);
+                            if (matched) {
+                                console.log(`[DynamicSprite] alias 그룹 매핑: "${aliasWord}" → "${w}"`);
+                                break;
+                            }
+                        }
+                    }
+                    if (matched) break;
+                }
+            }
+        }
+
         if (!matched) {
             // 매칭 실패 → null 반환 = 스프라이트 유지
             console.warn(`[DynamicSprite] (${settings.apiMode}, ${elapsed}ms) 매칭 실패: "${rawText}" → 스프라이트 유지`);
@@ -556,6 +688,60 @@ async function analyzeEmotion(messageText) {
         toastr.error(`감정 분석 실패: ${err.message}`, "Dynamic Sprite", { timeOut: 5000 });
         return null; // 실패 시에도 스프라이트 유지
     }
+}
+
+// ====================================================================
+// 감정 별칭 (alias) — 같은 의미의 다른 단어를 canonical 라벨로 매핑
+// AI가 등록된 라벨과 다른 단어를 뱉어도 매칭되게 함
+// ====================================================================
+const BUILTIN_ALIASES = {
+    // happy/joy 계열
+    happy: "happy", joy: "happy", joyful: "happy", glad: "happy", cheerful: "happy", delighted: "happy", elated: "happy",
+    // smile 계열
+    smile: "smile", smiling: "smile", grin: "smile", grinning: "smile",
+    // amused 계열
+    amused: "amused", entertained: "amused", chuckling: "amused", laughing: "amused",
+    // sad 계열
+    sad: "sad", sorrow: "sad", sorrowful: "sad", unhappy: "sad", melancholy: "sad", gloomy: "sad", depressed: "sad",
+    // angry 계열
+    angry: "angry", furious: "angry", mad: "angry", enraged: "angry", irritated: "angry", annoyed: "angry", irate: "angry",
+    // surprised 계열
+    surprised: "surprised", shocked: "surprised", astonished: "surprised", startled: "surprised", caught_off_guard: "surprised", caught: "surprised",
+    // fear 계열
+    afraid: "afraid", scared: "afraid", fearful: "afraid", terrified: "afraid", anxious: "afraid", nervous: "afraid",
+    // disgust 계열
+    disgusted: "disgust", disgust: "disgust", revolted: "disgust", repulsed: "disgust",
+    // contempt 계열
+    contempt: "contempt", contemptuous: "contempt", scornful: "contempt", disdainful: "contempt", disdain: "contempt",
+    // smirk 계열
+    smirk: "smirk", smirking: "smirk", slight_smirk: "smirk", smug: "smirk",
+    // tired 계열
+    tired: "tired", exhausted: "tired", weary: "tired", fatigued: "tired", worn_out: "tired", worn: "tired",
+    // neutral 계열
+    neutral: "neutral", blank: "neutral", emotionless: "neutral", expressionless: "neutral",
+    // aloof/cold 계열
+    aloof: "aloof", distant: "aloof", cold: "aloof", detached: "aloof", reserved: "aloof",
+    // guarded 계열
+    guarded: "guarded", wary: "guarded", cautious: "guarded", suspicious: "guarded",
+    // calculating 계열
+    calculating: "calculating", thoughtful: "calculating", scheming: "calculating", pondering: "calculating",
+    // embarrassed 계열
+    embarrassed: "embarrassed", flustered: "embarrassed", abashed: "embarrassed", bashful: "embarrassed",
+    // confused 계열
+    confused: "confused", puzzled: "confused", perplexed: "confused", bewildered: "confused",
+    // pain 계열
+    pain: "pain", hurt: "pain", suffering: "pain", agony: "pain",
+    // love/affection 계열
+    love: "love", loving: "love", affectionate: "love", fond: "love", tender: "love",
+    // determined 계열
+    determined: "determined", resolute: "determined", focused: "determined", serious: "determined",
+};
+
+// 사용자 정의 alias와 빌트인 alias 병합 (사용자 정의 우선)
+function getEmotionAliases() {
+    const settings = extension_settings[extensionName];
+    const userAliases = settings.userAliases || {};
+    return { ...BUILTIN_ALIASES, ...userAliases };
 }
 
 // ====================================================================
@@ -592,6 +778,56 @@ function extractEmotionFromFilename(filename) {
 }
 
 // ====================================================================
+// 이미지 자동 압축 (settings.imageBackup 용량 절약)
+// 가로/세로 중 큰 쪽을 maxDim에 맞춰 리사이즈, JPEG/WebP로 저장
+// ====================================================================
+async function compressImage(file, maxDim = 800, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            let { width, height } = img;
+            const ratio = Math.min(maxDim / width, maxDim / height, 1);
+            if (ratio >= 1) {
+                // 이미 작은 이미지면 원본 그대로 (PNG 투명도 유지를 위해)
+                resolve(file);
+                return;
+            }
+            const newW = Math.round(width * ratio);
+            const newH = Math.round(height * ratio);
+            const canvas = document.createElement("canvas");
+            canvas.width = newW;
+            canvas.height = newH;
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, newW, newH);
+
+            // 원본이 PNG이고 투명도가 필요할 수 있으면 PNG 유지, 아니면 WebP로
+            const isPNG = file.type === "image/png";
+            const outputType = isPNG ? "image/webp" : "image/webp"; // WebP가 항상 더 작음 (투명도 지원)
+            canvas.toBlob(blob => {
+                if (!blob) {
+                    resolve(file); // 압축 실패하면 원본
+                    return;
+                }
+                // 원본보다 작아진 경우만 사용
+                if (blob.size < file.size) {
+                    resolve(blob);
+                } else {
+                    resolve(file);
+                }
+            }, outputType, quality);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("이미지 로드 실패"));
+        };
+        img.src = url;
+    });
+}
+
+// ====================================================================
 // 감정 추가 (개별 파일)
 // ====================================================================
 async function addEmotion(file, customLabel = null, targetCharName = null) {
@@ -605,6 +841,19 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
     const charData = getCharData(charName);
     const label = customLabel || extractEmotionFromFilename(file.name);
 
+    // 자동 압축 적용
+    let processedFile = file;
+    if (settings.autoCompress !== false) {
+        try {
+            const maxDim = settings.compressMaxDim || 800;
+            const quality = (settings.compressQuality || 85) / 100;
+            processedFile = await compressImage(file, maxDim, quality);
+        } catch (err) {
+            console.warn("[DynamicSprite] 압축 실패, 원본 사용:", err);
+            processedFile = file;
+        }
+    }
+
     const existing = charData.emotions.find(e => e.label === label);
     if (existing) {
         // 폴더 일괄 등록 시엔 confirm 생략, 자동 덮어쓰기
@@ -614,12 +863,12 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
     }
 
     const imageKey = `${charName}__${label}__${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    await saveImage(imageKey, file);
+    await saveImage(imageKey, processedFile);
 
     // 자동 백업 - settings에 base64로 저장해서 origin 바뀌어도 복원 가능
     if (settings.autoBackup) {
         try {
-            const base64 = await blobToBase64(file);
+            const base64 = await blobToBase64(processedFile);
             settings.imageBackup = settings.imageBackup || {};
             settings.imageBackup[imageKey] = base64;
         } catch (err) {
@@ -628,7 +877,8 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
     }
 
     charData.emotions.push({
-        label, imageKey, description: "", addedAt: Date.now()
+        label, imageKey, description: "", addedAt: Date.now(),
+        usageCount: 0
     });
 
     saveSettingsDebounced();
@@ -814,11 +1064,18 @@ function renderEmotionList() {
         charData.emotions.forEach((emotion, idx) => {
             const item = document.createElement("div");
             item.className = "ds-emotion-item";
+            const usage = emotion.usageCount || 0;
+            const usageBadge = usage > 0
+                ? `<span class="ds-usage-badge" title="사용 횟수">×${usage}</span>`
+                : `<span class="ds-usage-badge ds-usage-zero" title="한 번도 안 쓰임">×0</span>`;
             item.innerHTML = `
                 <img class="ds-thumb" alt="${emotion.label}">
                 <div class="ds-emotion-info">
-                    <input type="text" class="ds-emotion-label text_pole"
-                        value="${emotion.label}" data-char="${charName}" data-idx="${idx}">
+                    <div class="ds-emotion-label-row">
+                        <input type="text" class="ds-emotion-label text_pole"
+                            value="${emotion.label}" data-char="${charName}" data-idx="${idx}">
+                        ${usageBadge}
+                    </div>
                     <textarea class="ds-emotion-desc text_pole" rows="2"
                         placeholder="설명 (선택) - 예: 차갑게 비웃는 표정"
                         data-char="${charName}" data-idx="${idx}">${emotion.description || ""}</textarea>
@@ -1096,10 +1353,43 @@ function createSettingsPanel() {
                     <h4>💾 표시 설정 프리셋</h4>
                     <p class="ds-hint">현재 표시 설정(데스크탑+모바일)을 이름 붙여 저장. 캐릭터별로 다른 위치 쓸 때 편함.</p>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <input type="text" id="ds-preset-name" class="text_pole" placeholder="프리셋 이름 (예: Damian용)" style="flex:1; min-width:140px;">
+                        <input type="text" id="ds-preset-name" class="text_pole" placeholder="프리셋 이름" style="flex:1; min-width:140px;">
                         <button id="ds-preset-save" class="menu_button">💾 저장</button>
                     </div>
                     <div id="ds-preset-list" style="margin-top:8px; display:flex; flex-direction:column; gap:4px;"></div>
+                </div>
+
+                <hr>
+
+                <div class="ds-section">
+                    <h4>🗜️ 이미지 압축 / 백업</h4>
+                    <p class="ds-hint">압축 켜면 업로드 시 자동으로 리사이즈/WebP 변환. 백업은 ST 설정에 base64로 저장해서 origin이 바뀌어도 자동 복원됨.</p>
+                    <label class="checkbox_label">
+                        <input id="ds-auto-compress" type="checkbox" ${settings.autoCompress !== false ? "checked" : ""}>
+                        <span>자동 압축 사용</span>
+                    </label>
+                    <label class="checkbox_label">
+                        <input id="ds-auto-backup" type="checkbox" ${settings.autoBackup !== false ? "checked" : ""}>
+                        <span>자동 백업 사용 (origin 변경 대비)</span>
+                    </label>
+                    <label>최대 크기 (가장 긴 변, px) — <span id="ds-compress-maxdim-val">${settings.compressMaxDim || 800}</span></label>
+                    <input id="ds-compress-maxdim" type="range" min="200" max="2000" step="50" value="${settings.compressMaxDim || 800}" class="ds-slider">
+                    <label>품질 (%) — <span id="ds-compress-quality-val">${settings.compressQuality || 85}</span></label>
+                    <input id="ds-compress-quality" type="range" min="30" max="100" step="5" value="${settings.compressQuality || 85}" class="ds-slider">
+                </div>
+
+                <hr>
+
+                <div class="ds-section">
+                    <h4>🔀 감정 별칭 (Alias)</h4>
+                    <p class="ds-hint">AI가 등록된 라벨과 다른 단어를 뱉을 때 의미가 같은 라벨로 자동 매칭. 빌트인 매핑(happy/joy/glad 등 약 80개)은 자동 적용됨. 여기서 추가 매핑 등록 가능.</p>
+                    <div id="ds-alias-list" style="margin-bottom:6px;"></div>
+                    <div class="ds-alias-row">
+                        <input type="text" id="ds-alias-from" class="text_pole" placeholder="AI가 말할 단어 (예: ecstatic)">
+                        <span class="ds-alias-arrow">→</span>
+                        <input type="text" id="ds-alias-to" class="text_pole" placeholder="매핑할 등록 라벨 (예: happy)">
+                        <button id="ds-alias-add" class="menu_button">+</button>
+                    </div>
                 </div>
 
                 <hr>
@@ -1455,6 +1745,67 @@ function createSettingsPanel() {
         renderEmotionList();
         toastr.success(`전체 ${total}개 감정을 삭제했습니다`);
     });
+
+    // === 압축 / 백업 설정 ===
+    $("#ds-auto-compress").on("change", function () {
+        settings.autoCompress = $(this).prop("checked");
+        saveSettingsDebounced();
+    });
+
+    $("#ds-auto-backup").on("change", function () {
+        settings.autoBackup = $(this).prop("checked");
+        saveSettingsDebounced();
+    });
+
+    bindDisplaySlider("ds-compress-maxdim", "ds-compress-maxdim-val", "compressMaxDim");
+    bindDisplaySlider("ds-compress-quality", "ds-compress-quality-val", "compressQuality");
+
+    // === alias 매니저 ===
+    function renderAliasList() {
+        const listEl = document.getElementById("ds-alias-list");
+        if (!listEl) return;
+        settings.userAliases = settings.userAliases || {};
+        const entries = Object.entries(settings.userAliases);
+        if (entries.length === 0) {
+            listEl.innerHTML = `<div class="ds-hint">사용자 추가 별칭 없음 (빌트인 매핑은 항상 작동)</div>`;
+            return;
+        }
+        listEl.innerHTML = entries.map(([from, to]) => `
+            <div class="ds-alias-row" style="background:rgba(255,255,255,0.04); padding:4px 8px; border-radius:4px;">
+                <span style="flex:1;">${from}</span>
+                <span class="ds-alias-arrow">→</span>
+                <span style="flex:1;">${to}</span>
+                <button class="menu_button ds-alias-del" data-from="${from}" style="padding:2px 6px;">🗑️</button>
+            </div>
+        `).join("");
+        listEl.querySelectorAll(".ds-alias-del").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const from = e.currentTarget.dataset.from;
+                delete settings.userAliases[from];
+                saveSettingsDebounced();
+                renderAliasList();
+            });
+        });
+    }
+
+    $("#ds-alias-add").on("click", function () {
+        const fromEl = document.getElementById("ds-alias-from");
+        const toEl = document.getElementById("ds-alias-to");
+        const from = fromEl.value.trim().toLowerCase();
+        const to = toEl.value.trim().toLowerCase();
+        if (!from || !to) {
+            toastr.warning("양쪽 다 입력해주세요");
+            return;
+        }
+        settings.userAliases = settings.userAliases || {};
+        settings.userAliases[from] = to;
+        saveSettingsDebounced();
+        fromEl.value = "";
+        toEl.value = "";
+        renderAliasList();
+    });
+
+    renderAliasList();
 
     $("#ds-custom-prompt").on("change", function () {
         settings.customPrompt = this.value;
