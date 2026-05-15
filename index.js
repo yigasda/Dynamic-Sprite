@@ -427,7 +427,7 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
     const body = {
         model: model,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
+        temperature: 0.3,
         max_tokens: 50
     };
 
@@ -452,7 +452,7 @@ async function callSTApi(prompt) {
     return await context.generateRaw({
         prompt: prompt,
         systemPrompt: "You are an emotion classification system. Output only the requested label, nothing else.",
-        responseLength: 50,
+        responseLength: 2000,
     });
 }
 
@@ -483,7 +483,7 @@ async function callSTProfile(prompt, profileName) {
             const result = await context.generateRaw({
                 prompt: prompt,
                 systemPrompt: "You are an emotion classification system. Output only the requested label, nothing else.",
-                responseLength: 50,
+                responseLength: 2000,
             });
 
             return result;
