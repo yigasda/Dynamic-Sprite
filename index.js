@@ -124,40 +124,82 @@ async function updateSprite(emotionLabel) {
     if (!charName) return;
 
     const charData = getCharData(charName);
+    // 정확 매칭만 — 없으면 neutral fallback, 그것도 없으면 변경 안 함
     const emotion = charData.emotions.find(e => e.label === emotionLabel)
-        || charData.emotions.find(e => e.label.toLowerCase() === "neutral")
-        || charData.emotions[0];
-    if (!emotion) return;
+        || charData.emotions.find(e => e.label.toLowerCase() === "neutral");
+    if (!emotion) {
+        console.warn(`[DynamicSprite] "${emotionLabel}" 매칭 실패, 스프라이트 유지`);
+        return;
+    }
 
     const img = document.getElementById("dynamic-sprite-img");
     if (!img) return;
 
     try {
         const blob = await loadImage(emotion.imageKey);
-        if (!blob) return;
+        if (!blob) {
+            console.warn(`[DynamicSprite] 이미지 blob 없음: ${emotion.imageKey}`);
+            return;
+        }
 
-        if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
-        currentBlobUrl = URL.createObjectURL(blob);
+        // 새 blob URL 만들기 (이미지 로드 완료 후 이전 거 해제)
+        const newBlobUrl = URL.createObjectURL(blob);
 
-        img.style.transition = `opacity ${settings.transitionDuration}ms ease`;
-        img.style.opacity = "0";
+        // 첫 표시인지 체크 (display none → block 전환)
+        const isFirstShow = img.style.display === "none" || !img.src;
 
-        setTimeout(() => {
-            img.src = currentBlobUrl;
+        if (isFirstShow) {
+            // 첫 표시: opacity 0으로 시작 → src 설정 → fade-in
+            img.style.transition = "none";
+            img.style.opacity = "0";
             img.style.display = "block";
-            img.style.opacity = "1";
-            charData.current = emotionLabel;
-            saveSettingsDebounced();
-        }, settings.transitionDuration);
+
+            img.onload = () => {
+                requestAnimationFrame(() => {
+                    img.style.transition = `opacity ${settings.transitionDuration}ms ease`;
+                    img.style.opacity = "1";
+                });
+                if (currentBlobUrl && currentBlobUrl !== newBlobUrl) {
+                    URL.revokeObjectURL(currentBlobUrl);
+                }
+                currentBlobUrl = newBlobUrl;
+                img.onload = null;
+            };
+            img.onerror = () => {
+                console.error(`[DynamicSprite] 이미지 표시 실패: ${emotion.label}`);
+                URL.revokeObjectURL(newBlobUrl);
+                img.onerror = null;
+            };
+            img.src = newBlobUrl;
+        } else {
+            // 전환: fade out → src 교체 → fade in
+            img.style.transition = `opacity ${settings.transitionDuration}ms ease`;
+            img.style.opacity = "0";
+
+            setTimeout(() => {
+                img.onload = () => {
+                    img.style.opacity = "1";
+                    if (currentBlobUrl && currentBlobUrl !== newBlobUrl) {
+                        URL.revokeObjectURL(currentBlobUrl);
+                    }
+                    currentBlobUrl = newBlobUrl;
+                    img.onload = null;
+                };
+                img.src = newBlobUrl;
+            }, settings.transitionDuration);
+        }
+
+        charData.current = emotion.label;
+        saveSettingsDebounced();
     } catch (err) {
         console.error("[DynamicSprite] 이미지 로드 실패:", err);
     }
 }
 
 // ====================================================================
-// 프롬프트 빌더
+// 프롬프트 빌더 - 캐릭터명 미포함 (배포용)
 // ====================================================================
-function buildEmotionPrompt(messageText, charName, charData, customInstruction) {
+function buildEmotionPrompt(messageText, charData, customInstruction) {
     const emotionDescriptions = charData.emotions.map(e => {
         return e.description?.trim()
             ? `- ${e.label}: ${e.description}`
@@ -166,21 +208,21 @@ function buildEmotionPrompt(messageText, charName, charData, customInstruction) 
 
     return `[System Task: Emotion Classification]
 
-다음 캐릭터(${charName})의 대사/행동을 읽고, 캐릭터가 지금 느끼는 가장 두드러진 감정 하나를 골라.
+You are classifying the dominant emotion shown by a character in a roleplay response. Read the text carefully and identify what the CHARACTER is feeling (not the narrator, not the user).
 
-[캐릭터 응답]
+[Character's response]
 ${messageText}
 
-[가능한 감정 라벨 - 반드시 이 중에서만 선택]
+[Available emotion labels - choose ONE]
 ${emotionDescriptions}
 
-${customInstruction ? `[캐릭터 성격 / 추가 지침]\n${customInstruction}\n` : ""}
-[규칙]
-- 위 라벨 중 하나의 이름만 정확히 출력 (설명은 출력하지 않음)
-- 마크다운, 따옴표, 다른 텍스트 일절 금지
-- 라벨 이름 하나만 단독으로 출력
+${customInstruction ? `[Character traits / additional instructions]\n${customInstruction}\n\n` : ""}[Important rules]
+- If the character expresses negative feelings (discomfort, displeasure, annoyance, contempt, fatigue, etc.), DO NOT pick "smile", "amused", or other positive labels.
+- If the character is being cold, distant, or dismissive, prefer "aloof", "guarded", "contempt", "disdain" over neutral.
+- Match the strongest signal in the text. If unclear or truly neutral, use "neutral".
+- Output ONLY the label name. No quotes, no markdown, no explanation, no punctuation.
 
-답:`;
+Label:`;
 }
 
 // ====================================================================
@@ -350,7 +392,7 @@ async function analyzeEmotion(messageText) {
     if (charData.emotions.length === 0) return null;
 
     const prompt = buildEmotionPrompt(
-        messageText, charName, charData, settings.customPrompt?.trim() || ""
+        messageText, charData, settings.customPrompt?.trim() || ""
     );
 
     try {
@@ -374,23 +416,39 @@ async function analyzeEmotion(messageText) {
         }
 
         const elapsed = Math.round(performance.now() - startTime);
-        const cleaned = result.trim().toLowerCase().replace(/[*_`"'.\s]+/g, "");
+        const rawText = result.trim();
+        const cleaned = rawText.toLowerCase().replace(/[*_`"'.\s,!?]+/g, "");
 
+        // 1차: 정확 매칭
         let matched = charData.emotions.find(e => e.label.toLowerCase() === cleaned);
+
+        // 2차: 첫 단어만 추출 후 매칭 (LLM이 가끔 문장 뱉는 경우)
         if (!matched) {
-            matched = charData.emotions.find(e =>
-                cleaned.includes(e.label.toLowerCase()) ||
-                e.label.toLowerCase().includes(cleaned)
-            );
+            const firstWord = rawText.split(/[\s,.\n]+/)[0].toLowerCase().replace(/[*_`"'.,!?]/g, "");
+            matched = charData.emotions.find(e => e.label.toLowerCase() === firstWord);
         }
 
-        const finalLabel = matched?.label || charData.emotions[0].label;
-        console.log(`[DynamicSprite] (${settings.apiMode}, ${elapsed}ms) "${result.trim()}" → ${finalLabel}`);
-        return finalLabel;
+        // 3차: 부분 매칭 (라벨이 텍스트에 정확히 포함)
+        if (!matched) {
+            matched = charData.emotions.find(e => {
+                const labelLower = e.label.toLowerCase();
+                const regex = new RegExp(`\\b${labelLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+                return regex.test(rawText.toLowerCase());
+            });
+        }
+
+        if (!matched) {
+            // 매칭 실패 → null 반환 = 스프라이트 유지
+            console.warn(`[DynamicSprite] (${settings.apiMode}, ${elapsed}ms) 매칭 실패: "${rawText}" → 스프라이트 유지`);
+            return null;
+        }
+
+        console.log(`[DynamicSprite] (${settings.apiMode}, ${elapsed}ms) "${rawText}" → ${matched.label}`);
+        return matched.label;
     } catch (err) {
         console.error("[DynamicSprite] 감정 분석 실패:", err);
         toastr.error(`감정 분석 실패: ${err.message}`, "Dynamic Sprite", { timeOut: 5000 });
-        return null;
+        return null; // 실패 시에도 스프라이트 유지
     }
 }
 
@@ -1108,7 +1166,7 @@ jQuery(async () => {
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageReceived);
 
         setTimeout(renderEmotionList, 500);
-        console.log("[DynamicSprite] v4 로드 완료");
+        console.log("[DynamicSprite] v5 로드 완료");
     } catch (err) {
         console.error("[DynamicSprite] 초기화 실패:", err);
     }
