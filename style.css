@@ -1,0 +1,243 @@
+/* ====================================================================
+   Dynamic Sprite Emotion v3
+==================================================================== */
+
+#dynamic-sprite-container {
+    position: fixed;
+    bottom: 0;
+    left: 20px;
+    z-index: 100;
+    pointer-events: none;
+    height: 80vh;
+    display: flex;
+    align-items: flex-end;
+}
+
+#dynamic-sprite-img {
+    max-height: 100%;
+    max-width: 400px;
+    height: auto;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+    opacity: 0;
+    display: none;
+    transition: opacity 300ms ease;
+}
+
+@media (max-width: 768px) {
+    #dynamic-sprite-container { height: 50vh; left: 10px; }
+    #dynamic-sprite-img { max-width: 200px; }
+}
+
+/* ====================================================================
+   설정 패널 공통
+==================================================================== */
+.dynamic-sprites-settings .inline-drawer-content { padding: 10px; }
+.dynamic-sprites-settings .ds-section { margin-bottom: 12px; }
+
+.dynamic-sprites-settings h4 {
+    margin: 4px 0 8px;
+    font-size: 0.95em;
+}
+
+.dynamic-sprites-settings .ds-hint {
+    font-size: 0.82em;
+    opacity: 0.75;
+    margin: 4px 0 8px;
+    line-height: 1.4;
+}
+
+.dynamic-sprites-settings .ds-hint code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.dynamic-sprites-settings label {
+    font-size: 0.9em;
+    margin-top: 6px;
+    margin-bottom: 2px;
+    display: block;
+}
+
+.dynamic-sprites-settings input[type="text"],
+.dynamic-sprites-settings input[type="password"],
+.dynamic-sprites-settings input[type="number"],
+.dynamic-sprites-settings textarea,
+.dynamic-sprites-settings select {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.dynamic-sprites-settings hr {
+    margin: 14px 0;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dynamic-sprites-settings .checkbox_label { margin: 6px 0; }
+
+/* ====================================================================
+   API 키 입력 (password + 토글)
+==================================================================== */
+.ds-key-input-wrap {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+}
+
+.ds-key-input-wrap input {
+    flex: 1;
+}
+
+.ds-key-input-wrap .menu_button {
+    padding: 4px 10px;
+    min-width: 40px;
+    flex-shrink: 0;
+}
+
+/* API 프리셋 버튼 */
+.ds-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ds-preset-btn {
+    padding: 4px 10px;
+    font-size: 0.85em;
+}
+
+#ds-api-test-result {
+    margin-top: 8px;
+    font-size: 0.88em;
+    line-height: 1.5;
+    min-height: 20px;
+}
+
+#ds-api-test-result code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+/* ST 모드 힌트 박스 */
+#ds-api-st-hint {
+    background: rgba(100, 180, 255, 0.08);
+    border-left: 3px solid rgba(100, 180, 255, 0.5);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+/* ====================================================================
+   감정 리스트
+==================================================================== */
+.ds-emotion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.ds-empty {
+    opacity: 0.6;
+    padding: 16px;
+    text-align: center;
+    font-size: 0.9em;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.ds-emotion-item {
+    display: grid;
+    grid-template-columns: 72px 1fr auto;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    align-items: start;
+    transition: background 150ms ease;
+}
+
+.ds-emotion-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.ds-thumb {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ds-emotion-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ds-emotion-label {
+    font-weight: 600;
+    font-size: 0.95em;
+}
+
+.ds-emotion-desc {
+    font-size: 0.85em;
+    resize: vertical;
+    min-height: 36px;
+}
+
+.ds-emotion-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ds-emotion-actions .menu_button {
+    padding: 4px 8px;
+    min-width: 36px;
+    font-size: 0.9em;
+}
+
+.ds-delete-btn:hover {
+    background: rgba(255, 80, 80, 0.2) !important;
+}
+
+#ds-upload-status {
+    margin-top: 8px;
+    font-size: 0.85em;
+    line-height: 1.5;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#ds-upload-status:empty { display: none; }
+
+#ds-test-result {
+    margin-top: 8px;
+    color: var(--SmartThemeQuoteColor);
+    font-size: 0.95em;
+    min-height: 20px;
+}
+
+.ds-actions-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ds-actions-row .menu_button {
+    flex: 1;
+    min-width: 100px;
+}

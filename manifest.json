@@ -1,0 +1,12 @@
+{
+    "display_name": "Dynamic Sprite Emotion",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Somang",
+    "version": "1.0.0",
+    "homePage": "",
+    "auto_update": false
+}
