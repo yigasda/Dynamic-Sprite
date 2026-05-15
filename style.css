@@ -1,5 +1,5 @@
 /* ====================================================================
-   Dynamic Sprite Emotion v3
+   Dynamic Sprite Emotion v4
 ==================================================================== */
 
 #dynamic-sprite-container {
@@ -80,7 +80,7 @@
 .dynamic-sprites-settings .checkbox_label { margin: 6px 0; }
 
 /* ====================================================================
-   API 키 입력 (password + 토글)
+   API 키
 ==================================================================== */
 .ds-key-input-wrap {
     display: flex;
@@ -88,9 +88,7 @@
     align-items: stretch;
 }
 
-.ds-key-input-wrap input {
-    flex: 1;
-}
+.ds-key-input-wrap input { flex: 1; }
 
 .ds-key-input-wrap .menu_button {
     padding: 4px 10px;
@@ -98,7 +96,6 @@
     flex-shrink: 0;
 }
 
-/* API 프리셋 버튼 */
 .ds-presets {
     display: flex;
     flex-wrap: wrap;
@@ -124,7 +121,6 @@
     border-radius: 3px;
 }
 
-/* ST 모드 힌트 박스 */
 #ds-api-st-hint {
     background: rgba(100, 180, 255, 0.08);
     border-left: 3px solid rgba(100, 180, 255, 0.5);
@@ -134,13 +130,13 @@
 }
 
 /* ====================================================================
-   감정 리스트
+   아코디언 - 캐릭터별 폴더
 ==================================================================== */
 .ds-emotion-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-height: 500px;
+    gap: 6px;
+    max-height: 600px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -155,29 +151,82 @@
     border: 1px dashed rgba(255, 255, 255, 0.15);
 }
 
-.ds-emotion-item {
-    display: grid;
-    grid-template-columns: 72px 1fr auto;
-    gap: 10px;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
+.ds-char-accordion {
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    align-items: start;
-    transition: background 150ms ease;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 200ms ease;
 }
 
-.ds-emotion-item:hover {
-    background: rgba(255, 255, 255, 0.07);
+.ds-char-accordion.ds-current {
+    border-color: var(--SmartThemeQuoteColor);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ds-char-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 150ms ease;
+    font-weight: 600;
+}
+
+.ds-char-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ds-char-toggle {
+    font-size: 0.8em;
+    opacity: 0.7;
+    width: 14px;
+    flex-shrink: 0;
+}
+
+.ds-char-name {
+    flex: 1;
+    font-size: 0.95em;
+}
+
+.ds-char-count {
+    font-size: 0.8em;
+    opacity: 0.6;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.ds-char-body {
+    padding: 6px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ====================================================================
+   감정 카드
+==================================================================== */
+.ds-emotion-item {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    align-items: start;
 }
 
 .ds-thumb {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
     object-fit: cover;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .ds-emotion-info {
@@ -189,13 +238,13 @@
 
 .ds-emotion-label {
     font-weight: 600;
-    font-size: 0.95em;
+    font-size: 0.9em;
 }
 
 .ds-emotion-desc {
-    font-size: 0.85em;
+    font-size: 0.82em;
     resize: vertical;
-    min-height: 36px;
+    min-height: 32px;
 }
 
 .ds-emotion-actions {
@@ -205,20 +254,34 @@
 }
 
 .ds-emotion-actions .menu_button {
-    padding: 4px 8px;
-    min-width: 36px;
-    font-size: 0.9em;
+    padding: 3px 6px;
+    min-width: 30px;
+    font-size: 0.85em;
 }
 
 .ds-delete-btn:hover {
     background: rgba(255, 80, 80, 0.2) !important;
 }
 
+/* ====================================================================
+   업로드 버튼들
+==================================================================== */
+.ds-upload-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ds-upload-buttons .menu_button {
+    flex: 1;
+    min-width: 130px;
+}
+
 #ds-upload-status {
     margin-top: 8px;
     font-size: 0.85em;
     line-height: 1.5;
-    max-height: 150px;
+    max-height: 200px;
     overflow-y: auto;
 }
 
@@ -239,5 +302,5 @@
 
 .ds-actions-row .menu_button {
     flex: 1;
-    min-width: 100px;
+    min-width: 90px;
 }
