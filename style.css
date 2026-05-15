@@ -20,82 +20,7 @@
     opacity: 0;
     display: none;
     transition: opacity 300ms ease;
-    pointer-events: auto;
-    cursor: pointer;
     /* max-width/opacity는 JS가 주입 */
-}
-
-/* ====================================================================
-   수동 감정 선택 팝업
-==================================================================== */
-#ds-manual-picker {
-    position: fixed;
-    z-index: 99999;
-    background: rgba(20, 20, 28, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    max-width: 320px;
-    min-width: 200px;
-    padding: 8px;
-    color: #fff;
-}
-
-.ds-picker-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 8px 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 0.85em;
-    font-weight: 600;
-    margin-bottom: 6px;
-}
-
-.ds-picker-close {
-    background: transparent;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    font-size: 1em;
-    padding: 0 4px;
-    opacity: 0.6;
-}
-
-.ds-picker-close:hover {
-    opacity: 1;
-}
-
-.ds-picker-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    max-height: 280px;
-    overflow-y: auto;
-}
-
-.ds-picker-item {
-    flex: 1 1 auto;
-    min-width: 80px;
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #fff;
-    cursor: pointer;
-    font-size: 0.85em;
-    transition: background 150ms ease;
-}
-
-.ds-picker-item:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.ds-picker-item.ds-picker-current {
-    background: rgba(100, 180, 255, 0.25);
-    border-color: rgba(100, 180, 255, 0.6);
 }
 
 /* ====================================================================
@@ -104,6 +29,115 @@
 .dynamic-sprites-settings .ds-slider {
     width: 100%;
     margin: 4px 0 8px;
+}
+
+/* ====================================================================
+   접기/펼치기 가능한 섹션
+==================================================================== */
+.dynamic-sprites-settings .ds-collapse-header {
+    cursor: pointer;
+    user-select: none;
+    margin: 4px 0 8px;
+    font-size: 0.95em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 150ms ease;
+}
+.dynamic-sprites-settings .ds-collapse-header:hover {
+    opacity: 0.8;
+}
+.dynamic-sprites-settings .ds-collapse-arrow {
+    font-size: 0.7em;
+    opacity: 0.7;
+    width: 12px;
+    flex-shrink: 0;
+}
+.dynamic-sprites-settings .ds-collapse-body {
+    padding-top: 4px;
+}
+
+/* ====================================================================
+   마술봉 - 감정 수동 선택 팝업
+==================================================================== */
+#ds-emotion-picker-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 99999;
+    background: rgba(20, 20, 28, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    max-width: 360px;
+    width: calc(100% - 40px);
+    max-height: 70vh;
+    padding: 12px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+}
+
+.ds-picker-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.ds-picker-popup-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 2px 8px;
+    opacity: 0.6;
+    border-radius: 4px;
+}
+
+.ds-picker-popup-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.ds-picker-popup-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.ds-picker-popup-item {
+    flex: 1 1 auto;
+    min-width: 90px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.88em;
+    transition: all 150ms ease;
+}
+
+.ds-picker-popup-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.ds-picker-popup-item.ds-picker-popup-current {
+    background: rgba(100, 180, 255, 0.25);
+    border-color: rgba(100, 180, 255, 0.6);
+    font-weight: 600;
 }
 
 /* ====================================================================
