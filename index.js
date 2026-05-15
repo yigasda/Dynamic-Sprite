@@ -323,7 +323,14 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
 // ====================================================================
 async function callSTApi(prompt) {
     const context = getContext();
-    return await context.generateQuietPrompt(prompt, false, false);
+    return await context.generateQuietPrompt({
+        quietPrompt: prompt,
+        skipWIAN: true,
+        quietToLoud: false,
+        quietImage: null,
+        quietName: 'EmotionClassifier',
+        responseLength: 50
+    });
 }
 
 // ====================================================================
