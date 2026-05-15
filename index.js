@@ -336,14 +336,19 @@ ${messageText}
 [Available emotion labels - choose ONE]
 ${emotionDescriptions}
 
-${customInstruction ? `[Character traits / additional instructions]\n${customInstruction}\n\n` : ""}[Important rules]
-- If the character expresses negative feelings (discomfort, displeasure, annoyance, contempt, fatigue, etc.), DO NOT pick "smile", "amused", or other positive labels.
-- If the character is being cold, distant, or dismissive, prefer "aloof", "guarded", "contempt", "disdain" over neutral.
-- Match the strongest signal in the text. If unclear or truly neutral, use "neutral".
+${customInstruction ? `[Character traits / additional instructions]\n${customInstruction}\n\n` : ""}[Classification guidelines]
+- Default to "neutral" for ordinary conversation, small talk, factual statements, or mild responses without clear emotional signals. Most everyday dialogue is neutral.
+- Only pick a strong emotion (positive OR negative) when the text contains clear, explicit signals: emotional words, tone markers, body language descriptions, or unmistakable context.
+- Treat positive and negative emotions with equal weight. Do NOT default toward negative labels (guarded, contempt, aloof, tired, etc.) just because the tone is calm or reserved. Calm ≠ negative.
+- "guarded", "contempt", "aloof", "disdain" require explicit hostility, suspicion, or dismissiveness in the text — not just absence of warmth.
+- "smile", "amused", "happy" require explicit positive signals — warmth, laughter, fondness, playfulness, soft tone toward the other person.
+- If the character is making casual conversation, asking questions, or giving information without emotional charge → "neutral".
+- If genuinely ambiguous between two emotions, prefer the milder/more neutral one.
 - Output ONLY the label name. No quotes, no markdown, no explanation, no punctuation.
 
 Label:`;
 }
+
 
 // ====================================================================
 // Gemini 직접 호출 - 토큰 버그 수정!
@@ -357,7 +362,7 @@ async function callGemini(prompt, apiKey, model) {
     const body = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-            temperature: 0.1,
+            temperature: 0.3,
             // 🔧 BUG FIX: Gemini 2.5는 reasoning 토큰을 먼저 쓰므로 넉넉히
             maxOutputTokens: 500,
             topP: 0.95,
