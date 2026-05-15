@@ -19,6 +19,25 @@ const defaultSettings = {
     apiEndpoint: "",
     apiModel: "",
 
+    // === 데스크탑 표시 설정 ===
+    desktopPosition: "bottom-left", // bottom-left, bottom-right, bottom-center
+    desktopOffsetX: 20,    // px (가장자리로부터 떨어진 거리)
+    desktopOffsetY: 0,     // px (바닥에서 위로 띄우는 거리)
+    desktopHeight: 80,     // vh (화면 높이 대비 %)
+    desktopMaxWidth: 400,  // px
+    desktopOpacity: 100,   // %
+    desktopZIndex: 100,
+
+    // === 모바일 표시 설정 ===
+    mobilePosition: "bottom-left",
+    mobileOffsetX: 10,
+    mobileOffsetY: 0,
+    mobileHeight: 50,
+    mobileMaxWidth: 200,
+    mobileOpacity: 100,
+    mobileZIndex: 100,
+    mobileBreakpoint: 768, // 이 너비 이하면 모바일 설정 적용
+
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
     characters: {},
     expandedChars: {} // { charName: true/false }
@@ -115,6 +134,57 @@ function createSpriteContainer() {
     document.body.appendChild(container);
 }
 
+// ====================================================================
+// 표시 스타일 동적 적용 (CSS 변수 주입)
+// ====================================================================
+function applyDisplayStyles() {
+    const settings = extension_settings[extensionName];
+    let styleEl = document.getElementById("ds-dynamic-styles");
+    if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "ds-dynamic-styles";
+        document.head.appendChild(styleEl);
+    }
+
+    const buildPositionCSS = (pos, offsetX, offsetY) => {
+        let css = `bottom: ${offsetY}px;`;
+        if (pos === "bottom-left") {
+            css += ` left: ${offsetX}px; right: auto; transform: none;`;
+        } else if (pos === "bottom-right") {
+            css += ` right: ${offsetX}px; left: auto; transform: none;`;
+        } else if (pos === "bottom-center") {
+            css += ` left: 50%; right: auto; transform: translateX(-50%);`;
+        }
+        return css;
+    };
+
+    const desktopPos = buildPositionCSS(settings.desktopPosition, settings.desktopOffsetX, settings.desktopOffsetY);
+    const mobilePos = buildPositionCSS(settings.mobilePosition, settings.mobileOffsetX, settings.mobileOffsetY);
+
+    styleEl.textContent = `
+        #dynamic-sprite-container {
+            ${desktopPos}
+            height: ${settings.desktopHeight}vh;
+            z-index: ${settings.desktopZIndex};
+        }
+        #dynamic-sprite-img {
+            max-width: ${settings.desktopMaxWidth}px;
+            opacity: ${settings.desktopOpacity / 100};
+        }
+        @media (max-width: ${settings.mobileBreakpoint}px) {
+            #dynamic-sprite-container {
+                ${mobilePos}
+                height: ${settings.mobileHeight}vh;
+                z-index: ${settings.mobileZIndex};
+            }
+            #dynamic-sprite-img {
+                max-width: ${settings.mobileMaxWidth}px;
+                opacity: ${settings.mobileOpacity / 100};
+            }
+        }
+    `;
+}
+
 let currentBlobUrl = null;
 async function updateSprite(emotionLabel) {
     const settings = extension_settings[extensionName];
@@ -142,6 +212,10 @@ async function updateSprite(emotionLabel) {
             return;
         }
 
+        // 모바일 여부에 따라 목표 opacity 결정
+        const isMobile = window.innerWidth <= settings.mobileBreakpoint;
+        const targetOpacity = (isMobile ? settings.mobileOpacity : settings.desktopOpacity) / 100;
+
         // 새 blob URL 만들기 (이미지 로드 완료 후 이전 거 해제)
         const newBlobUrl = URL.createObjectURL(blob);
 
@@ -157,7 +231,7 @@ async function updateSprite(emotionLabel) {
             img.onload = () => {
                 requestAnimationFrame(() => {
                     img.style.transition = `opacity ${settings.transitionDuration}ms ease`;
-                    img.style.opacity = "1";
+                    img.style.opacity = String(targetOpacity);
                 });
                 if (currentBlobUrl && currentBlobUrl !== newBlobUrl) {
                     URL.revokeObjectURL(currentBlobUrl);
@@ -178,7 +252,7 @@ async function updateSprite(emotionLabel) {
 
             setTimeout(() => {
                 img.onload = () => {
-                    img.style.opacity = "1";
+                    img.style.opacity = String(targetOpacity);
                     if (currentBlobUrl && currentBlobUrl !== newBlobUrl) {
                         URL.revokeObjectURL(currentBlobUrl);
                     }
@@ -829,6 +903,74 @@ function createSettingsPanel() {
                 <hr>
 
                 <div class="ds-section">
+                    <h4>🖥️ 데스크탑 표시 설정</h4>
+
+                    <label>위치</label>
+                    <select id="ds-desktop-position" class="text_pole">
+                        <option value="bottom-left" ${settings.desktopPosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
+                        <option value="bottom-center" ${settings.desktopPosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
+                        <option value="bottom-right" ${settings.desktopPosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
+                    </select>
+
+                    <label>가장자리 여백 X (px) — <span id="ds-desktop-offset-x-val">${settings.desktopOffsetX}</span></label>
+                    <input id="ds-desktop-offset-x" type="range" min="0" max="500" value="${settings.desktopOffsetX}" class="ds-slider">
+
+                    <label>바닥 여백 Y (px) — <span id="ds-desktop-offset-y-val">${settings.desktopOffsetY}</span></label>
+                    <input id="ds-desktop-offset-y" type="range" min="0" max="500" value="${settings.desktopOffsetY}" class="ds-slider">
+
+                    <label>높이 (화면 대비 %) — <span id="ds-desktop-height-val">${settings.desktopHeight}</span></label>
+                    <input id="ds-desktop-height" type="range" min="10" max="100" value="${settings.desktopHeight}" class="ds-slider">
+
+                    <label>최대 너비 (px) — <span id="ds-desktop-maxwidth-val">${settings.desktopMaxWidth}</span></label>
+                    <input id="ds-desktop-maxwidth" type="range" min="50" max="1000" step="10" value="${settings.desktopMaxWidth}" class="ds-slider">
+
+                    <label>투명도 (%) — <span id="ds-desktop-opacity-val">${settings.desktopOpacity}</span></label>
+                    <input id="ds-desktop-opacity" type="range" min="10" max="100" value="${settings.desktopOpacity}" class="ds-slider">
+
+                    <label>z-index (다른 UI보다 위로 띄우려면 높임) — <span id="ds-desktop-zindex-val">${settings.desktopZIndex}</span></label>
+                    <input id="ds-desktop-zindex" type="range" min="0" max="9999" step="10" value="${settings.desktopZIndex}" class="ds-slider">
+                </div>
+
+                <hr>
+
+                <div class="ds-section">
+                    <h4>📱 모바일 표시 설정</h4>
+                    <p class="ds-hint">화면 너비가 아래 기준 이하일 때 적용됨.</p>
+
+                    <label>모바일 기준 너비 (px) — <span id="ds-mobile-breakpoint-val">${settings.mobileBreakpoint}</span></label>
+                    <input id="ds-mobile-breakpoint" type="range" min="320" max="1200" step="10" value="${settings.mobileBreakpoint}" class="ds-slider">
+
+                    <label>위치</label>
+                    <select id="ds-mobile-position" class="text_pole">
+                        <option value="bottom-left" ${settings.mobilePosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
+                        <option value="bottom-center" ${settings.mobilePosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
+                        <option value="bottom-right" ${settings.mobilePosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
+                    </select>
+
+                    <label>가장자리 여백 X (px) — <span id="ds-mobile-offset-x-val">${settings.mobileOffsetX}</span></label>
+                    <input id="ds-mobile-offset-x" type="range" min="0" max="300" value="${settings.mobileOffsetX}" class="ds-slider">
+
+                    <label>바닥 여백 Y (px) — <span id="ds-mobile-offset-y-val">${settings.mobileOffsetY}</span></label>
+                    <input id="ds-mobile-offset-y" type="range" min="0" max="500" value="${settings.mobileOffsetY}" class="ds-slider">
+
+                    <label>높이 (화면 대비 %) — <span id="ds-mobile-height-val">${settings.mobileHeight}</span></label>
+                    <input id="ds-mobile-height" type="range" min="10" max="100" value="${settings.mobileHeight}" class="ds-slider">
+
+                    <label>최대 너비 (px) — <span id="ds-mobile-maxwidth-val">${settings.mobileMaxWidth}</span></label>
+                    <input id="ds-mobile-maxwidth" type="range" min="50" max="800" step="10" value="${settings.mobileMaxWidth}" class="ds-slider">
+
+                    <label>투명도 (%) — <span id="ds-mobile-opacity-val">${settings.mobileOpacity}</span></label>
+                    <input id="ds-mobile-opacity" type="range" min="10" max="100" value="${settings.mobileOpacity}" class="ds-slider">
+
+                    <label>z-index (모바일 채팅창에 가려지면 높임) — <span id="ds-mobile-zindex-val">${settings.mobileZIndex}</span></label>
+                    <input id="ds-mobile-zindex" type="range" min="0" max="9999" step="10" value="${settings.mobileZIndex}" class="ds-slider">
+
+                    <button id="ds-display-reset" class="menu_button" style="margin-top:10px;">↺ 표시 설정 기본값으로</button>
+                </div>
+
+                <hr>
+
+                <div class="ds-section">
                     <h4>⚡ 감정 분석용 API</h4>
                     <p class="ds-hint">본문 생성과 별도로 빠른 모델 사용 가능.</p>
 
@@ -956,6 +1098,92 @@ function createSettingsPanel() {
     $("#ds-transition").on("change", function () {
         settings.transitionDuration = parseInt(this.value) || 300;
         saveSettingsDebounced();
+    });
+
+    // === 표시 설정 슬라이더 ===
+    // 슬라이더 값 변경 시 즉시 반영하는 헬퍼
+    const bindDisplaySlider = (sliderId, valueLabelId, settingKey, parser = parseInt) => {
+        const slider = document.getElementById(sliderId);
+        const label = document.getElementById(valueLabelId);
+        if (!slider) return;
+        slider.addEventListener("input", () => {
+            const v = parser(slider.value);
+            settings[settingKey] = v;
+            if (label) label.textContent = v;
+            applyDisplayStyles();
+        });
+        slider.addEventListener("change", () => {
+            saveSettingsDebounced();
+        });
+    };
+
+    // 데스크탑
+    bindDisplaySlider("ds-desktop-offset-x", "ds-desktop-offset-x-val", "desktopOffsetX");
+    bindDisplaySlider("ds-desktop-offset-y", "ds-desktop-offset-y-val", "desktopOffsetY");
+    bindDisplaySlider("ds-desktop-height", "ds-desktop-height-val", "desktopHeight");
+    bindDisplaySlider("ds-desktop-maxwidth", "ds-desktop-maxwidth-val", "desktopMaxWidth");
+    bindDisplaySlider("ds-desktop-opacity", "ds-desktop-opacity-val", "desktopOpacity");
+    bindDisplaySlider("ds-desktop-zindex", "ds-desktop-zindex-val", "desktopZIndex");
+
+    $("#ds-desktop-position").on("change", function () {
+        settings.desktopPosition = this.value;
+        applyDisplayStyles();
+        saveSettingsDebounced();
+    });
+
+    // 모바일
+    bindDisplaySlider("ds-mobile-breakpoint", "ds-mobile-breakpoint-val", "mobileBreakpoint");
+    bindDisplaySlider("ds-mobile-offset-x", "ds-mobile-offset-x-val", "mobileOffsetX");
+    bindDisplaySlider("ds-mobile-offset-y", "ds-mobile-offset-y-val", "mobileOffsetY");
+    bindDisplaySlider("ds-mobile-height", "ds-mobile-height-val", "mobileHeight");
+    bindDisplaySlider("ds-mobile-maxwidth", "ds-mobile-maxwidth-val", "mobileMaxWidth");
+    bindDisplaySlider("ds-mobile-opacity", "ds-mobile-opacity-val", "mobileOpacity");
+    bindDisplaySlider("ds-mobile-zindex", "ds-mobile-zindex-val", "mobileZIndex");
+
+    $("#ds-mobile-position").on("change", function () {
+        settings.mobilePosition = this.value;
+        applyDisplayStyles();
+        saveSettingsDebounced();
+    });
+
+    $("#ds-display-reset").on("click", function () {
+        const displayKeys = [
+            "desktopPosition", "desktopOffsetX", "desktopOffsetY", "desktopHeight",
+            "desktopMaxWidth", "desktopOpacity", "desktopZIndex",
+            "mobilePosition", "mobileOffsetX", "mobileOffsetY", "mobileHeight",
+            "mobileMaxWidth", "mobileOpacity", "mobileZIndex", "mobileBreakpoint"
+        ];
+        displayKeys.forEach(k => settings[k] = defaultSettings[k]);
+        applyDisplayStyles();
+        saveSettingsDebounced();
+        // UI 슬라이더/셀렉트 값 동기화
+        document.getElementById("ds-desktop-position").value = settings.desktopPosition;
+        document.getElementById("ds-mobile-position").value = settings.mobilePosition;
+        displayKeys.forEach(k => {
+            const map = {
+                desktopOffsetX: ["ds-desktop-offset-x", "ds-desktop-offset-x-val"],
+                desktopOffsetY: ["ds-desktop-offset-y", "ds-desktop-offset-y-val"],
+                desktopHeight: ["ds-desktop-height", "ds-desktop-height-val"],
+                desktopMaxWidth: ["ds-desktop-maxwidth", "ds-desktop-maxwidth-val"],
+                desktopOpacity: ["ds-desktop-opacity", "ds-desktop-opacity-val"],
+                desktopZIndex: ["ds-desktop-zindex", "ds-desktop-zindex-val"],
+                mobileBreakpoint: ["ds-mobile-breakpoint", "ds-mobile-breakpoint-val"],
+                mobileOffsetX: ["ds-mobile-offset-x", "ds-mobile-offset-x-val"],
+                mobileOffsetY: ["ds-mobile-offset-y", "ds-mobile-offset-y-val"],
+                mobileHeight: ["ds-mobile-height", "ds-mobile-height-val"],
+                mobileMaxWidth: ["ds-mobile-maxwidth", "ds-mobile-maxwidth-val"],
+                mobileOpacity: ["ds-mobile-opacity", "ds-mobile-opacity-val"],
+                mobileZIndex: ["ds-mobile-zindex", "ds-mobile-zindex-val"]
+            };
+            if (map[k]) {
+                const [sId, lId] = map[k];
+                const s = document.getElementById(sId);
+                const l = document.getElementById(lId);
+                if (s) s.value = settings[k];
+                if (l) l.textContent = settings[k];
+            }
+        });
+        toastr.success("표시 설정을 기본값으로 되돌렸습니다");
     });
 
     $("#ds-custom-prompt").on("change", function () {
@@ -1169,6 +1397,7 @@ jQuery(async () => {
         loadSettings();
         await openDB();
         createSpriteContainer();
+        applyDisplayStyles();
         createSettingsPanel();
 
         eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
