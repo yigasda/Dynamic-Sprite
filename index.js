@@ -323,12 +323,11 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
 // ====================================================================
 async function callSTApi(prompt) {
     const context = getContext();
-    return await context.generateQuietPrompt({
-        quietPrompt: prompt,
-        skipWIAN: true,
-        quietToLoud: false,
-        quietName: 'EmotionClassifier',
-        responseLength: 50
+    // generateRaw: 캐릭터 카드/페르소나/WIAN 전부 무시, 순수 프롬프트만 전송
+    return await context.generateRaw({
+        prompt: prompt,
+        systemPrompt: "You are an emotion classification system. Output only the requested label, nothing else.",
+        responseLength: 50,
     });
 }
 
@@ -355,13 +354,11 @@ async function callSTProfile(prompt, profileName) {
             // 약간의 대기 (전환 안정화)
             await new Promise(r => setTimeout(r, 200));
 
-            // 본문 생성 함수 호출 (skipWIAN으로 세계관/페르소나 차단)
-            const result = await context.generateQuietPrompt({
-                quietPrompt: prompt,
-                skipWIAN: true,
-                quietToLoud: false,
-                quietName: 'EmotionClassifier',
-                responseLength: 50
+            // generateRaw: 캐릭터 카드/페르소나/WIAN 전부 무시
+            const result = await context.generateRaw({
+                prompt: prompt,
+                systemPrompt: "You are an emotion classification system. Output only the requested label, nothing else.",
+                responseLength: 50,
             });
 
             return result;
