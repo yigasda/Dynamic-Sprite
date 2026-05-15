@@ -1505,9 +1505,9 @@ function createSettingsPanel() {
                 <hr>
 
                 <div class="ds-section ds-actions-row">
-                    <button id="ds-refresh" class="menu_button">🔄 리스트 새로고침</button>
-                    <button id="ds-export" class="menu_button">📤 백업</button>
-                    <button id="ds-import-btn" class="menu_button">📥 복원</button>
+                    <button id="ds-refresh" class="menu_button">리스트 새로고침</button>
+                    <button id="ds-export" class="menu_button">백업</button>
+                    <button id="ds-import-btn" class="menu_button">복원</button>
                     <input type="file" id="ds-import-input" accept=".json" style="display:none;">
                 </div>
             </div>
