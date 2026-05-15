@@ -38,6 +38,15 @@ const defaultSettings = {
     mobileZIndex: 100,
     mobileBreakpoint: 768, // 이 너비 이하면 모바일 설정 적용
 
+    // === 표시 설정 프리셋 (이름 → 설정 스냅샷) ===
+    displayPresets: {},
+
+    // === origin 백업 (이미지 base64) - 자동복구용 ===
+    // 키: imageKey → 값: base64 dataURL
+    // 새 origin에서 IndexedDB 비어있으면 여기서 자동 복원
+    imageBackup: {},
+    autoBackup: true, // 이미지 업로드 시 자동으로 imageBackup에 백업
+
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
     characters: {},
     expandedChars: {} // { charName: true/false }
@@ -592,6 +601,7 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
         return null;
     }
 
+    const settings = extension_settings[extensionName];
     const charData = getCharData(charName);
     const label = customLabel || extractEmotionFromFilename(file.name);
 
@@ -599,11 +609,23 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
     if (existing) {
         // 폴더 일괄 등록 시엔 confirm 생략, 자동 덮어쓰기
         await deleteImage(existing.imageKey);
+        if (settings.imageBackup) delete settings.imageBackup[existing.imageKey];
         charData.emotions = charData.emotions.filter(e => e.label !== label);
     }
 
     const imageKey = `${charName}__${label}__${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     await saveImage(imageKey, file);
+
+    // 자동 백업 - settings에 base64로 저장해서 origin 바뀌어도 복원 가능
+    if (settings.autoBackup) {
+        try {
+            const base64 = await blobToBase64(file);
+            settings.imageBackup = settings.imageBackup || {};
+            settings.imageBackup[imageKey] = base64;
+        } catch (err) {
+            console.warn("[DynamicSprite] 자동 백업 실패:", err);
+        }
+    }
 
     charData.emotions.push({
         label, imageKey, description: "", addedAt: Date.now()
@@ -611,6 +633,91 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
 
     saveSettingsDebounced();
     return label;
+}
+
+// ====================================================================
+// 캐릭터의 모든 감정 일괄 삭제
+// ====================================================================
+async function deleteAllEmotionsForChar(charName) {
+    const settings = extension_settings[extensionName];
+    const charData = settings.characters[charName];
+    if (!charData || charData.emotions.length === 0) return 0;
+
+    const count = charData.emotions.length;
+    for (const emotion of charData.emotions) {
+        try {
+            await deleteImage(emotion.imageKey);
+            if (settings.imageBackup) delete settings.imageBackup[emotion.imageKey];
+        } catch (err) {
+            console.warn(`[DynamicSprite] 삭제 실패: ${emotion.imageKey}`, err);
+        }
+    }
+    charData.emotions = [];
+    charData.current = null;
+    saveSettingsDebounced();
+    return count;
+}
+
+// ====================================================================
+// 전체 감정 데이터 일괄 삭제 (모든 캐릭터)
+// ====================================================================
+async function deleteAllEmotionsEverywhere() {
+    const settings = extension_settings[extensionName];
+    let total = 0;
+    for (const charName in settings.characters) {
+        total += await deleteAllEmotionsForChar(charName);
+    }
+    // 메모리 정리
+    settings.characters = {};
+    settings.imageBackup = {};
+    saveSettingsDebounced();
+    return total;
+}
+
+// ====================================================================
+// 자동 복구 - IndexedDB가 비어있는데 백업은 있는 경우
+// (origin이 바뀌어서 IndexedDB가 격리된 상황 자동 감지)
+// ====================================================================
+async function autoRestoreFromBackup() {
+    const settings = extension_settings[extensionName];
+    if (!settings.imageBackup || Object.keys(settings.imageBackup).length === 0) return 0;
+
+    // 등록된 imageKey들 모음
+    const expectedKeys = new Set();
+    for (const charName in settings.characters) {
+        for (const emotion of settings.characters[charName].emotions) {
+            expectedKeys.add(emotion.imageKey);
+        }
+    }
+    if (expectedKeys.size === 0) return 0;
+
+    // IndexedDB에 실제 존재하는 키 확인
+    let existingCount = 0;
+    for (const key of expectedKeys) {
+        try {
+            const blob = await loadImage(key);
+            if (blob) existingCount++;
+        } catch {}
+    }
+
+    // 전부 다 있으면 복구 불필요
+    if (existingCount === expectedKeys.size) return 0;
+
+    // 누락된 거 복구
+    let restored = 0;
+    for (const key of expectedKeys) {
+        try {
+            const blob = await loadImage(key);
+            if (!blob && settings.imageBackup[key]) {
+                const restoredBlob = await base64ToBlob(settings.imageBackup[key]);
+                await saveImage(key, restoredBlob);
+                restored++;
+            }
+        } catch (err) {
+            console.warn(`[DynamicSprite] 복원 실패: ${key}`, err);
+        }
+    }
+    return restored;
 }
 
 // ====================================================================
@@ -790,6 +897,7 @@ function renderEmotionList() {
             const emotion = settings.characters[cn].emotions[idx];
             if (!confirm(`"${emotion.label}" 감정을 삭제할까요?`)) return;
             await deleteImage(emotion.imageKey);
+            if (settings.imageBackup) delete settings.imageBackup[emotion.imageKey];
             settings.characters[cn].emotions.splice(idx, 1);
             saveSettingsDebounced();
             renderEmotionList();
@@ -985,6 +1093,18 @@ function createSettingsPanel() {
                 <hr>
 
                 <div class="ds-section">
+                    <h4>💾 표시 설정 프리셋</h4>
+                    <p class="ds-hint">현재 표시 설정(데스크탑+모바일)을 이름 붙여 저장. 캐릭터별로 다른 위치 쓸 때 편함.</p>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <input type="text" id="ds-preset-name" class="text_pole" placeholder="프리셋 이름 (예: Damian용)" style="flex:1; min-width:140px;">
+                        <button id="ds-preset-save" class="menu_button">💾 저장</button>
+                    </div>
+                    <div id="ds-preset-list" style="margin-top:8px; display:flex; flex-direction:column; gap:4px;"></div>
+                </div>
+
+                <hr>
+
+                <div class="ds-section">
                     <h4>⚡ 감정 분석용 API</h4>
                     <p class="ds-hint">본문 생성과 별도로 빠른 모델 사용 가능.</p>
 
@@ -1044,6 +1164,10 @@ function createSettingsPanel() {
 
                 <div class="ds-section">
                     <h4>현재 활성 캐릭터: <span id="ds-current-char" style="color:var(--SmartThemeQuoteColor);"></span></h4>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+                        <button id="ds-delete-current-char" class="menu_button" style="flex:1; min-width:120px;">🗑️ 현재 캐릭터 감정 전체 삭제</button>
+                        <button id="ds-delete-all" class="menu_button" style="flex:1; min-width:120px; color:#ff8080;">⚠️ 모든 캐릭터 전체 삭제</button>
+                    </div>
                     <div id="ds-emotion-list" class="ds-emotion-list"></div>
                 </div>
 
@@ -1068,7 +1192,7 @@ function createSettingsPanel() {
                 <div class="ds-section">
                     <h4>🧠 캐릭터 성격 / 분석 지침</h4>
                     <textarea id="ds-custom-prompt" class="text_pole" rows="3"
-                        placeholder="예: Damian은 무뚝뚝하고 감정 표현을 절제하는 성격. 명확한 신호 없을 때는 neutral 우선.">${settings.customPrompt || ""}</textarea>
+                        placeholder="예: 이 character는 무뚝뚝하고 감정 표현을 절제하는 성격. 명확한 신호 없을 때는 neutral 우선.">${settings.customPrompt || ""}</textarea>
                 </div>
 
                 <hr>
@@ -1198,6 +1322,138 @@ function createSettingsPanel() {
             }
         });
         toastr.success("표시 설정을 기본값으로 되돌렸습니다");
+    });
+
+    // === 표시 설정 프리셋 ===
+    const DISPLAY_KEYS = [
+        "desktopPosition", "desktopOffsetX", "desktopOffsetY", "desktopHeight",
+        "desktopMaxWidth", "desktopOpacity", "desktopZIndex",
+        "mobilePosition", "mobileOffsetX", "mobileOffsetY", "mobileHeight",
+        "mobileMaxWidth", "mobileOpacity", "mobileZIndex", "mobileBreakpoint"
+    ];
+
+    const DISPLAY_UI_MAP = {
+        desktopOffsetX: ["ds-desktop-offset-x", "ds-desktop-offset-x-val"],
+        desktopOffsetY: ["ds-desktop-offset-y", "ds-desktop-offset-y-val"],
+        desktopHeight: ["ds-desktop-height", "ds-desktop-height-val"],
+        desktopMaxWidth: ["ds-desktop-maxwidth", "ds-desktop-maxwidth-val"],
+        desktopOpacity: ["ds-desktop-opacity", "ds-desktop-opacity-val"],
+        desktopZIndex: ["ds-desktop-zindex", "ds-desktop-zindex-val"],
+        mobileBreakpoint: ["ds-mobile-breakpoint", "ds-mobile-breakpoint-val"],
+        mobileOffsetX: ["ds-mobile-offset-x", "ds-mobile-offset-x-val"],
+        mobileOffsetY: ["ds-mobile-offset-y", "ds-mobile-offset-y-val"],
+        mobileHeight: ["ds-mobile-height", "ds-mobile-height-val"],
+        mobileMaxWidth: ["ds-mobile-maxwidth", "ds-mobile-maxwidth-val"],
+        mobileOpacity: ["ds-mobile-opacity", "ds-mobile-opacity-val"],
+        mobileZIndex: ["ds-mobile-zindex", "ds-mobile-zindex-val"]
+    };
+
+    function syncDisplayUI() {
+        document.getElementById("ds-desktop-position").value = settings.desktopPosition;
+        document.getElementById("ds-mobile-position").value = settings.mobilePosition;
+        for (const k of DISPLAY_KEYS) {
+            if (DISPLAY_UI_MAP[k]) {
+                const [sId, lId] = DISPLAY_UI_MAP[k];
+                const s = document.getElementById(sId);
+                const l = document.getElementById(lId);
+                if (s) s.value = settings[k];
+                if (l) l.textContent = settings[k];
+            }
+        }
+    }
+
+    function renderPresetList() {
+        const listEl = document.getElementById("ds-preset-list");
+        if (!listEl) return;
+        settings.displayPresets = settings.displayPresets || {};
+        const names = Object.keys(settings.displayPresets);
+        if (names.length === 0) {
+            listEl.innerHTML = `<div class="ds-hint">저장된 프리셋 없음</div>`;
+            return;
+        }
+        listEl.innerHTML = names.map(name => `
+            <div style="display:flex; gap:4px; align-items:center;">
+                <span style="flex:1; font-size:0.9em; padding:4px 8px; background:rgba(255,255,255,0.05); border-radius:4px;">${name}</span>
+                <button class="menu_button ds-preset-load" data-name="${name}" style="padding:4px 8px;">▶ 불러오기</button>
+                <button class="menu_button ds-preset-delete" data-name="${name}" style="padding:4px 8px;">🗑️</button>
+            </div>
+        `).join("");
+
+        listEl.querySelectorAll(".ds-preset-load").forEach(btn => {
+            btn.addEventListener("click", e => {
+                const name = e.currentTarget.dataset.name;
+                const preset = settings.displayPresets[name];
+                if (!preset) return;
+                for (const k of DISPLAY_KEYS) {
+                    if (preset[k] !== undefined) settings[k] = preset[k];
+                }
+                applyDisplayStyles();
+                syncDisplayUI();
+                saveSettingsDebounced();
+                toastr.success(`"${name}" 프리셋 불러옴`);
+            });
+        });
+
+        listEl.querySelectorAll(".ds-preset-delete").forEach(btn => {
+            btn.addEventListener("click", e => {
+                const name = e.currentTarget.dataset.name;
+                if (!confirm(`"${name}" 프리셋을 삭제할까요?`)) return;
+                delete settings.displayPresets[name];
+                saveSettingsDebounced();
+                renderPresetList();
+            });
+        });
+    }
+
+    $("#ds-preset-save").on("click", function () {
+        const nameInput = document.getElementById("ds-preset-name");
+        const name = nameInput.value.trim();
+        if (!name) {
+            toastr.warning("프리셋 이름을 입력하세요");
+            return;
+        }
+        settings.displayPresets = settings.displayPresets || {};
+        if (settings.displayPresets[name] && !confirm(`"${name}"이 이미 있어요. 덮어쓸까요?`)) return;
+        const snapshot = {};
+        for (const k of DISPLAY_KEYS) snapshot[k] = settings[k];
+        settings.displayPresets[name] = snapshot;
+        saveSettingsDebounced();
+        nameInput.value = "";
+        renderPresetList();
+        toastr.success(`"${name}" 프리셋 저장됨`);
+    });
+
+    renderPresetList();
+
+    // === 일괄 삭제 버튼 ===
+    $("#ds-delete-current-char").on("click", async function () {
+        const charName = getCurrentCharName();
+        if (!charName) {
+            toastr.warning("현재 캐릭터를 찾을 수 없습니다");
+            return;
+        }
+        const charData = settings.characters[charName];
+        if (!charData || charData.emotions.length === 0) {
+            toastr.info(`"${charName}"에 등록된 감정이 없습니다`);
+            return;
+        }
+        if (!confirm(`"${charName}"의 감정 ${charData.emotions.length}개를 모두 삭제할까요? (이미지 파일과 백업까지 삭제)`)) return;
+        const count = await deleteAllEmotionsForChar(charName);
+        renderEmotionList();
+        toastr.success(`"${charName}"의 감정 ${count}개를 삭제했습니다`);
+    });
+
+    $("#ds-delete-all").on("click", async function () {
+        const charCount = Object.keys(settings.characters).filter(n => settings.characters[n].emotions.length > 0).length;
+        if (charCount === 0) {
+            toastr.info("삭제할 감정이 없습니다");
+            return;
+        }
+        if (!confirm(`⚠️ 모든 캐릭터의 감정 데이터를 전부 삭제합니다.\n캐릭터 수: ${charCount}\n진짜로 삭제할까요? (되돌릴 수 없음)`)) return;
+        if (!confirm("정말 확실해요? 마지막 확인입니다.")) return;
+        const total = await deleteAllEmotionsEverywhere();
+        renderEmotionList();
+        toastr.success(`전체 ${total}개 감정을 삭제했습니다`);
     });
 
     $("#ds-custom-prompt").on("change", function () {
@@ -1363,16 +1619,24 @@ function createSettingsPanel() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
+            const stg = extension_settings[extensionName];
+            stg.imageBackup = stg.imageBackup || {};
             for (const key in data.images) {
-                const blob = await base64ToBlob(data.images[key]);
+                const base64 = data.images[key];
+                const blob = await base64ToBlob(base64);
                 await saveImage(key, blob);
+                // 백업에도 저장해서 다음 origin 변경 시에도 안전
+                stg.imageBackup[key] = base64;
             }
-            Object.assign(
-                extension_settings[extensionName].characters,
-                data.settings.characters
-            );
+            Object.assign(stg.characters, data.settings.characters);
+            // 프리셋도 있으면 병합
+            if (data.settings.displayPresets) {
+                stg.displayPresets = stg.displayPresets || {};
+                Object.assign(stg.displayPresets, data.settings.displayPresets);
+            }
             saveSettingsDebounced();
             renderEmotionList();
+            renderPresetList();
             toastr.success("가져오기 완료");
         } catch (err) {
             toastr.error("가져오기 실패: " + err.message);
@@ -1413,6 +1677,17 @@ jQuery(async () => {
         createSpriteContainer();
         applyDisplayStyles();
         createSettingsPanel();
+
+        // origin이 바뀌어서 IndexedDB가 비어있는데 백업은 있는 경우 자동 복원
+        try {
+            const restored = await autoRestoreFromBackup();
+            if (restored > 0) {
+                console.log(`[DynamicSprite] 백업에서 ${restored}개 이미지 자동 복원됨`);
+                toastr.success(`이미지 ${restored}개를 백업에서 자동 복원했습니다`, "Dynamic Sprite", { timeOut: 4000 });
+            }
+        } catch (err) {
+            console.warn("[DynamicSprite] 자동 복원 실패:", err);
+        }
 
         eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageReceived);
