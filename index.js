@@ -59,7 +59,17 @@ const defaultSettings = {
 
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
     characters: {},
-    expandedChars: {} // { charName: true/false }
+    expandedChars: {}, // { charName: true/false }
+
+    // 설정 패널 섹션별 접힘 상태 (기본 다 접힘)
+    collapsedSections: {
+        desktopDisplay: true,
+        mobileDisplay: true,
+        presets: true,
+        compress: true,
+        alias: true,
+        groups: true
+    }
 };
 
 // ====================================================================
@@ -151,94 +161,6 @@ function createSpriteContainer() {
     container.id = "dynamic-sprite-container";
     container.innerHTML = `<img id="dynamic-sprite-img" alt="sprite">`;
     document.body.appendChild(container);
-
-    // 스프라이트 클릭 시 수동 감정 선택 메뉴
-    const img = container.querySelector("#dynamic-sprite-img");
-    img.addEventListener("click", (e) => {
-        e.stopPropagation();
-        showManualEmotionPicker(e);
-    });
-}
-
-// ====================================================================
-// 수동 감정 선택 팝업
-// ====================================================================
-let manualPickerEl = null;
-function showManualEmotionPicker(event) {
-    const settings = extension_settings[extensionName];
-    const charName = getCurrentCharName();
-    if (!charName) return;
-    const charData = getCharData(charName);
-    if (charData.emotions.length === 0) return;
-
-    // 이미 떠있으면 닫기
-    if (manualPickerEl) {
-        manualPickerEl.remove();
-        manualPickerEl = null;
-        return;
-    }
-
-    const picker = document.createElement("div");
-    picker.id = "ds-manual-picker";
-    picker.innerHTML = `
-        <div class="ds-picker-header">
-            <span>감정 선택 — ${charName}</span>
-            <button class="ds-picker-close">✕</button>
-        </div>
-        <div class="ds-picker-grid">
-            ${charData.emotions.map(e => `
-                <button class="ds-picker-item ${e.label === charData.current ? "ds-picker-current" : ""}" data-label="${e.label}">
-                    <span class="ds-picker-label">${e.label}</span>
-                </button>
-            `).join("")}
-        </div>
-    `;
-    document.body.appendChild(picker);
-    manualPickerEl = picker;
-
-    // 팝업 위치: 스프라이트 위쪽에
-    const img = document.getElementById("dynamic-sprite-img");
-    const rect = img.getBoundingClientRect();
-    const pickerRect = picker.getBoundingClientRect();
-    let top = rect.top - pickerRect.height - 10;
-    let left = rect.left;
-    // 화면 위로 튀어나가면 아래로
-    if (top < 10) top = rect.bottom + 10;
-    // 화면 오른쪽 튀어나가면 조정
-    if (left + pickerRect.width > window.innerWidth - 10) {
-        left = window.innerWidth - pickerRect.width - 10;
-    }
-    if (left < 10) left = 10;
-    picker.style.top = `${top}px`;
-    picker.style.left = `${left}px`;
-
-    // 이벤트
-    picker.querySelectorAll(".ds-picker-item").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const label = e.currentTarget.dataset.label;
-            updateSprite(label);
-            picker.remove();
-            manualPickerEl = null;
-        });
-    });
-    picker.querySelector(".ds-picker-close").addEventListener("click", (e) => {
-        e.stopPropagation();
-        picker.remove();
-        manualPickerEl = null;
-    });
-
-    // 바깥 클릭 시 닫기
-    setTimeout(() => {
-        const closeOnOutside = (ev) => {
-            if (!picker.contains(ev.target) && ev.target.id !== "dynamic-sprite-img") {
-                picker.remove();
-                manualPickerEl = null;
-                document.removeEventListener("click", closeOnOutside);
-            }
-        };
-        document.addEventListener("click", closeOnOutside);
-    }, 0);
 }
 
 // ====================================================================
@@ -588,6 +510,37 @@ function getSTProfiles() {
 }
 
 // ====================================================================
+// 분석 캐시 (메모리) — 같은 메시지 재분석 시 API 호출 안 함
+// ====================================================================
+const analysisCache = new Map(); // key: charName::messageHash → label
+const ANALYSIS_CACHE_MAX = 200;
+
+function simpleHash(str) {
+    // 빠른 해시 (FNV-1a 변형)
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(36);
+}
+
+function cacheGet(charName, messageText) {
+    const key = `${charName}::${simpleHash(messageText)}`;
+    return analysisCache.get(key) || null;
+}
+
+function cacheSet(charName, messageText, label) {
+    if (analysisCache.size >= ANALYSIS_CACHE_MAX) {
+        // FIFO 정리 - 가장 오래된 절반 제거
+        const keys = [...analysisCache.keys()];
+        for (let i = 0; i < keys.length / 2; i++) analysisCache.delete(keys[i]);
+    }
+    const key = `${charName}::${simpleHash(messageText)}`;
+    analysisCache.set(key, label);
+}
+
+// ====================================================================
 // 감정 분석 통합 라우터
 // ====================================================================
 async function analyzeEmotion(messageText) {
@@ -597,6 +550,17 @@ async function analyzeEmotion(messageText) {
 
     const charData = getCharData(charName);
     if (charData.emotions.length === 0) return null;
+
+    // 캐시 확인
+    const cached = cacheGet(charName, messageText);
+    if (cached) {
+        // 캐시에 있는 라벨이 아직 등록된 라벨인지도 확인
+        const stillExists = charData.emotions.some(e => e.label === cached);
+        if (stillExists) {
+            console.log(`[DynamicSprite] (cache) → ${cached}`);
+            return cached;
+        }
+    }
 
     const prompt = buildEmotionPrompt(
         messageText, charData, settings.customPrompt?.trim() || ""
@@ -682,6 +646,7 @@ async function analyzeEmotion(messageText) {
         }
 
         console.log(`[DynamicSprite] (${settings.apiMode}, ${elapsed}ms) "${rawText}" → ${matched.label}`);
+        cacheSet(charName, messageText, matched.label);
         return matched.label;
     } catch (err) {
         console.error("[DynamicSprite] 감정 분석 실패:", err);
@@ -1068,6 +1033,7 @@ function renderEmotionList() {
             const usageBadge = usage > 0
                 ? `<span class="ds-usage-badge" title="사용 횟수">×${usage}</span>`
                 : `<span class="ds-usage-badge ds-usage-zero" title="한 번도 안 쓰임">×0</span>`;
+            const groupsValue = Array.isArray(emotion.groups) ? emotion.groups.join(", ") : "";
             item.innerHTML = `
                 <img class="ds-thumb" alt="${emotion.label}">
                 <div class="ds-emotion-info">
@@ -1079,6 +1045,10 @@ function renderEmotionList() {
                     <textarea class="ds-emotion-desc text_pole" rows="2"
                         placeholder="설명 (선택) - 예: 차갑게 비웃는 표정"
                         data-char="${charName}" data-idx="${idx}">${emotion.description || ""}</textarea>
+                    <input type="text" class="ds-emotion-groups text_pole"
+                        placeholder="그룹/태그 (쉼표 구분, 선택) - 예: 긍정, 차분"
+                        value="${groupsValue}" data-char="${charName}" data-idx="${idx}"
+                        style="font-size:0.82em; margin-top:2px;">
                 </div>
                 <div class="ds-emotion-actions">
                     <button class="menu_button ds-preview-btn" data-char="${charName}" data-idx="${idx}" title="미리보기">👁</button>
@@ -1129,6 +1099,20 @@ function renderEmotionList() {
             const cn = e.target.dataset.char;
             const idx = parseInt(e.target.dataset.idx);
             settings.characters[cn].emotions[idx].description = e.target.value.trim();
+            saveSettingsDebounced();
+        });
+    });
+
+    // 그룹/태그 수정
+    listEl.querySelectorAll(".ds-emotion-groups").forEach(input => {
+        input.addEventListener("change", (e) => {
+            const cn = e.target.dataset.char;
+            const idx = parseInt(e.target.dataset.idx);
+            const groups = e.target.value
+                .split(",")
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+            settings.characters[cn].emotions[idx].groups = groups;
             saveSettingsDebounced();
         });
     });
@@ -1281,114 +1265,137 @@ function createSettingsPanel() {
 
                 <hr>
 
-                <div class="ds-section">
-                    <h4>🖥️ 데스크탑 표시 설정</h4>
+                <div class="ds-section ds-collapsible" data-collapse-key="desktopDisplay">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🖥️ 데스크탑 표시 설정</h4>
+                    <div class="ds-collapse-body">
+                        <label>위치</label>
+                        <select id="ds-desktop-position" class="text_pole">
+                            <option value="bottom-left" ${settings.desktopPosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
+                            <option value="bottom-center" ${settings.desktopPosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
+                            <option value="bottom-right" ${settings.desktopPosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
+                        </select>
 
-                    <label>위치</label>
-                    <select id="ds-desktop-position" class="text_pole">
-                        <option value="bottom-left" ${settings.desktopPosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
-                        <option value="bottom-center" ${settings.desktopPosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
-                        <option value="bottom-right" ${settings.desktopPosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
-                    </select>
+                        <label>가장자리 여백 X (px) — <span id="ds-desktop-offset-x-val">${settings.desktopOffsetX}</span></label>
+                        <input id="ds-desktop-offset-x" type="range" min="0" max="500" value="${settings.desktopOffsetX}" class="ds-slider">
 
-                    <label>가장자리 여백 X (px) — <span id="ds-desktop-offset-x-val">${settings.desktopOffsetX}</span></label>
-                    <input id="ds-desktop-offset-x" type="range" min="0" max="500" value="${settings.desktopOffsetX}" class="ds-slider">
+                        <label>바닥 여백 Y (px) — <span id="ds-desktop-offset-y-val">${settings.desktopOffsetY}</span></label>
+                        <input id="ds-desktop-offset-y" type="range" min="0" max="500" value="${settings.desktopOffsetY}" class="ds-slider">
 
-                    <label>바닥 여백 Y (px) — <span id="ds-desktop-offset-y-val">${settings.desktopOffsetY}</span></label>
-                    <input id="ds-desktop-offset-y" type="range" min="0" max="500" value="${settings.desktopOffsetY}" class="ds-slider">
+                        <label>높이 (화면 대비 %) — <span id="ds-desktop-height-val">${settings.desktopHeight}</span></label>
+                        <input id="ds-desktop-height" type="range" min="10" max="100" value="${settings.desktopHeight}" class="ds-slider">
 
-                    <label>높이 (화면 대비 %) — <span id="ds-desktop-height-val">${settings.desktopHeight}</span></label>
-                    <input id="ds-desktop-height" type="range" min="10" max="100" value="${settings.desktopHeight}" class="ds-slider">
+                        <label>최대 너비 (px) — <span id="ds-desktop-maxwidth-val">${settings.desktopMaxWidth}</span></label>
+                        <input id="ds-desktop-maxwidth" type="range" min="50" max="1000" step="10" value="${settings.desktopMaxWidth}" class="ds-slider">
 
-                    <label>최대 너비 (px) — <span id="ds-desktop-maxwidth-val">${settings.desktopMaxWidth}</span></label>
-                    <input id="ds-desktop-maxwidth" type="range" min="50" max="1000" step="10" value="${settings.desktopMaxWidth}" class="ds-slider">
+                        <label>투명도 (%) — <span id="ds-desktop-opacity-val">${settings.desktopOpacity}</span></label>
+                        <input id="ds-desktop-opacity" type="range" min="10" max="100" value="${settings.desktopOpacity}" class="ds-slider">
 
-                    <label>투명도 (%) — <span id="ds-desktop-opacity-val">${settings.desktopOpacity}</span></label>
-                    <input id="ds-desktop-opacity" type="range" min="10" max="100" value="${settings.desktopOpacity}" class="ds-slider">
-
-                    <label>z-index (다른 UI보다 위로 띄우려면 높임) — <span id="ds-desktop-zindex-val">${settings.desktopZIndex}</span></label>
-                    <input id="ds-desktop-zindex" type="range" min="0" max="9999" step="10" value="${settings.desktopZIndex}" class="ds-slider">
-                </div>
-
-                <hr>
-
-                <div class="ds-section">
-                    <h4>📱 모바일 표시 설정</h4>
-                    <p class="ds-hint">화면 너비가 아래 기준 이하일 때 적용됨.</p>
-
-                    <label>모바일 기준 너비 (px) — <span id="ds-mobile-breakpoint-val">${settings.mobileBreakpoint}</span></label>
-                    <input id="ds-mobile-breakpoint" type="range" min="320" max="1200" step="10" value="${settings.mobileBreakpoint}" class="ds-slider">
-
-                    <label>위치</label>
-                    <select id="ds-mobile-position" class="text_pole">
-                        <option value="bottom-left" ${settings.mobilePosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
-                        <option value="bottom-center" ${settings.mobilePosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
-                        <option value="bottom-right" ${settings.mobilePosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
-                    </select>
-
-                    <label>가장자리 여백 X (px) — <span id="ds-mobile-offset-x-val">${settings.mobileOffsetX}</span></label>
-                    <input id="ds-mobile-offset-x" type="range" min="0" max="300" value="${settings.mobileOffsetX}" class="ds-slider">
-
-                    <label>바닥 여백 Y (px) — <span id="ds-mobile-offset-y-val">${settings.mobileOffsetY}</span></label>
-                    <input id="ds-mobile-offset-y" type="range" min="0" max="500" value="${settings.mobileOffsetY}" class="ds-slider">
-
-                    <label>높이 (화면 대비 %) — <span id="ds-mobile-height-val">${settings.mobileHeight}</span></label>
-                    <input id="ds-mobile-height" type="range" min="10" max="100" value="${settings.mobileHeight}" class="ds-slider">
-
-                    <label>최대 너비 (px) — <span id="ds-mobile-maxwidth-val">${settings.mobileMaxWidth}</span></label>
-                    <input id="ds-mobile-maxwidth" type="range" min="50" max="800" step="10" value="${settings.mobileMaxWidth}" class="ds-slider">
-
-                    <label>투명도 (%) — <span id="ds-mobile-opacity-val">${settings.mobileOpacity}</span></label>
-                    <input id="ds-mobile-opacity" type="range" min="10" max="100" value="${settings.mobileOpacity}" class="ds-slider">
-
-                    <label>z-index (모바일 채팅창에 가려지면 높임) — <span id="ds-mobile-zindex-val">${settings.mobileZIndex}</span></label>
-                    <input id="ds-mobile-zindex" type="range" min="0" max="9999" step="10" value="${settings.mobileZIndex}" class="ds-slider">
-
-                    <button id="ds-display-reset" class="menu_button" style="margin-top:10px;">↺ 표시 설정 기본값으로</button>
-                </div>
-
-                <hr>
-
-                <div class="ds-section">
-                    <h4>💾 표시 설정 프리셋</h4>
-                    <p class="ds-hint">현재 표시 설정(데스크탑+모바일)을 이름 붙여 저장. 캐릭터별로 다른 위치 쓸 때 편함.</p>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <input type="text" id="ds-preset-name" class="text_pole" placeholder="프리셋 이름" style="flex:1; min-width:140px;">
-                        <button id="ds-preset-save" class="menu_button">💾 저장</button>
+                        <label>z-index (다른 UI보다 위로 띄우려면 높임) — <span id="ds-desktop-zindex-val">${settings.desktopZIndex}</span></label>
+                        <input id="ds-desktop-zindex" type="range" min="0" max="9999" step="10" value="${settings.desktopZIndex}" class="ds-slider">
                     </div>
-                    <div id="ds-preset-list" style="margin-top:8px; display:flex; flex-direction:column; gap:4px;"></div>
                 </div>
 
                 <hr>
 
-                <div class="ds-section">
-                    <h4>🗜️ 이미지 압축 / 백업</h4>
-                    <p class="ds-hint">압축 켜면 업로드 시 자동으로 리사이즈/WebP 변환. 백업은 ST 설정에 base64로 저장해서 origin이 바뀌어도 자동 복원됨.</p>
-                    <label class="checkbox_label">
-                        <input id="ds-auto-compress" type="checkbox" ${settings.autoCompress !== false ? "checked" : ""}>
-                        <span>자동 압축 사용</span>
-                    </label>
-                    <label class="checkbox_label">
-                        <input id="ds-auto-backup" type="checkbox" ${settings.autoBackup !== false ? "checked" : ""}>
-                        <span>자동 백업 사용 (origin 변경 대비)</span>
-                    </label>
-                    <label>최대 크기 (가장 긴 변, px) — <span id="ds-compress-maxdim-val">${settings.compressMaxDim || 800}</span></label>
-                    <input id="ds-compress-maxdim" type="range" min="200" max="2000" step="50" value="${settings.compressMaxDim || 800}" class="ds-slider">
-                    <label>품질 (%) — <span id="ds-compress-quality-val">${settings.compressQuality || 85}</span></label>
-                    <input id="ds-compress-quality" type="range" min="30" max="100" step="5" value="${settings.compressQuality || 85}" class="ds-slider">
+                <div class="ds-section ds-collapsible" data-collapse-key="mobileDisplay">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 📱 모바일 표시 설정</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">화면 너비가 아래 기준 이하일 때 적용됨.</p>
+
+                        <label>모바일 기준 너비 (px) — <span id="ds-mobile-breakpoint-val">${settings.mobileBreakpoint}</span></label>
+                        <input id="ds-mobile-breakpoint" type="range" min="320" max="1200" step="10" value="${settings.mobileBreakpoint}" class="ds-slider">
+
+                        <label>위치</label>
+                        <select id="ds-mobile-position" class="text_pole">
+                            <option value="bottom-left" ${settings.mobilePosition === "bottom-left" ? "selected" : ""}>왼쪽 아래</option>
+                            <option value="bottom-center" ${settings.mobilePosition === "bottom-center" ? "selected" : ""}>중앙 아래</option>
+                            <option value="bottom-right" ${settings.mobilePosition === "bottom-right" ? "selected" : ""}>오른쪽 아래</option>
+                        </select>
+
+                        <label>가장자리 여백 X (px) — <span id="ds-mobile-offset-x-val">${settings.mobileOffsetX}</span></label>
+                        <input id="ds-mobile-offset-x" type="range" min="0" max="300" value="${settings.mobileOffsetX}" class="ds-slider">
+
+                        <label>바닥 여백 Y (px) — <span id="ds-mobile-offset-y-val">${settings.mobileOffsetY}</span></label>
+                        <input id="ds-mobile-offset-y" type="range" min="0" max="500" value="${settings.mobileOffsetY}" class="ds-slider">
+
+                        <label>높이 (화면 대비 %) — <span id="ds-mobile-height-val">${settings.mobileHeight}</span></label>
+                        <input id="ds-mobile-height" type="range" min="10" max="100" value="${settings.mobileHeight}" class="ds-slider">
+
+                        <label>최대 너비 (px) — <span id="ds-mobile-maxwidth-val">${settings.mobileMaxWidth}</span></label>
+                        <input id="ds-mobile-maxwidth" type="range" min="50" max="800" step="10" value="${settings.mobileMaxWidth}" class="ds-slider">
+
+                        <label>투명도 (%) — <span id="ds-mobile-opacity-val">${settings.mobileOpacity}</span></label>
+                        <input id="ds-mobile-opacity" type="range" min="10" max="100" value="${settings.mobileOpacity}" class="ds-slider">
+
+                        <label>z-index (모바일 채팅창에 가려지면 높임) — <span id="ds-mobile-zindex-val">${settings.mobileZIndex}</span></label>
+                        <input id="ds-mobile-zindex" type="range" min="0" max="9999" step="10" value="${settings.mobileZIndex}" class="ds-slider">
+
+                        <button id="ds-display-reset" class="menu_button" style="margin-top:10px;">↺ 표시 설정 기본값으로</button>
+                    </div>
                 </div>
 
                 <hr>
 
-                <div class="ds-section">
-                    <h4>🔀 감정 별칭 (Alias)</h4>
-                    <p class="ds-hint">AI가 등록된 라벨과 다른 단어를 뱉을 때 의미가 같은 라벨로 자동 매칭. 빌트인 매핑(happy/joy/glad 등 약 80개)은 자동 적용됨. 여기서 추가 매핑 등록 가능.</p>
-                    <div id="ds-alias-list" style="margin-bottom:6px;"></div>
-                    <div class="ds-alias-row">
-                        <input type="text" id="ds-alias-from" class="text_pole" placeholder="AI가 말할 단어 (예: ecstatic)">
-                        <span class="ds-alias-arrow">→</span>
-                        <input type="text" id="ds-alias-to" class="text_pole" placeholder="매핑할 등록 라벨 (예: happy)">
-                        <button id="ds-alias-add" class="menu_button">+</button>
+                <div class="ds-section ds-collapsible" data-collapse-key="presets">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 💾 표시 설정 프리셋</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">현재 표시 설정(데스크탑+모바일)을 이름 붙여 저장. 캐릭터별로 다른 위치 쓸 때 편함.</p>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <input type="text" id="ds-preset-name" class="text_pole" placeholder="프리셋 이름" style="flex:1; min-width:140px;">
+                            <button id="ds-preset-save" class="menu_button">💾 저장</button>
+                        </div>
+                        <div id="ds-preset-list" style="margin-top:8px; display:flex; flex-direction:column; gap:4px;"></div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="ds-section ds-collapsible" data-collapse-key="compress">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🗜️ 이미지 압축 / 백업</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">압축 켜면 업로드 시 자동으로 리사이즈/WebP 변환. 백업은 ST 설정에 base64로 저장해서 origin이 바뀌어도 자동 복원됨.</p>
+                        <label class="checkbox_label">
+                            <input id="ds-auto-compress" type="checkbox" ${settings.autoCompress !== false ? "checked" : ""}>
+                            <span>자동 압축 사용</span>
+                        </label>
+                        <label class="checkbox_label">
+                            <input id="ds-auto-backup" type="checkbox" ${settings.autoBackup !== false ? "checked" : ""}>
+                            <span>자동 백업 사용 (origin 변경 대비)</span>
+                        </label>
+                        <label>최대 크기 (가장 긴 변, px) — <span id="ds-compress-maxdim-val">${settings.compressMaxDim || 800}</span></label>
+                        <input id="ds-compress-maxdim" type="range" min="200" max="2000" step="50" value="${settings.compressMaxDim || 800}" class="ds-slider">
+                        <label>품질 (%) — <span id="ds-compress-quality-val">${settings.compressQuality || 85}</span></label>
+                        <input id="ds-compress-quality" type="range" min="30" max="100" step="5" value="${settings.compressQuality || 85}" class="ds-slider">
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="ds-section ds-collapsible" data-collapse-key="alias">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🔀 감정 별칭 (Alias)</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">AI가 등록된 라벨과 다른 단어를 뱉을 때 의미가 같은 라벨로 자동 매칭. 빌트인 매핑(happy/joy/glad 등 약 80개)은 자동 적용됨. 여기서 추가 매핑 등록 가능.</p>
+                        <div id="ds-alias-list" style="margin-bottom:6px;"></div>
+                        <div class="ds-alias-row">
+                            <input type="text" id="ds-alias-from" class="text_pole" placeholder="AI가 말할 단어 (예: ecstatic)">
+                            <span class="ds-alias-arrow">→</span>
+                            <input type="text" id="ds-alias-to" class="text_pole" placeholder="매핑할 등록 라벨 (예: happy)">
+                            <button id="ds-alias-add" class="menu_button">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="ds-section ds-collapsible" data-collapse-key="groups">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 📊 통계 / 그룹별 사용</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">현재 캐릭터의 감정 사용 통계. 그룹은 감정 카드의 "그룹/태그" 입력으로 지정.</p>
+                        <div style="display:flex; gap:6px; margin-bottom:8px;">
+                            <button id="ds-stats-refresh" class="menu_button" style="flex:1;">🔄 통계 새로고침</button>
+                            <button id="ds-stats-reset" class="menu_button" style="flex:1;">↺ 카운트 초기화</button>
+                        </div>
+                        <div id="ds-stats-content"></div>
                     </div>
                 </div>
 
@@ -1807,6 +1814,111 @@ function createSettingsPanel() {
 
     renderAliasList();
 
+    // === 통계 / 그룹별 사용 ===
+    function renderStats() {
+        const contentEl = document.getElementById("ds-stats-content");
+        if (!contentEl) return;
+        const charName = getCurrentCharName();
+        if (!charName) {
+            contentEl.innerHTML = `<div class="ds-hint">캐릭터를 선택하세요</div>`;
+            return;
+        }
+        const charData = settings.characters[charName];
+        if (!charData || charData.emotions.length === 0) {
+            contentEl.innerHTML = `<div class="ds-hint">"${charName}"에 등록된 감정 없음</div>`;
+            return;
+        }
+
+        const totalUsage = charData.emotions.reduce((sum, e) => sum + (e.usageCount || 0), 0);
+
+        // 그룹별 통계
+        const groupStats = {};
+        const ungrouped = [];
+        for (const emotion of charData.emotions) {
+            const usage = emotion.usageCount || 0;
+            const groups = Array.isArray(emotion.groups) && emotion.groups.length > 0 ? emotion.groups : null;
+            if (groups) {
+                for (const g of groups) {
+                    if (!groupStats[g]) groupStats[g] = { count: 0, emotions: [] };
+                    groupStats[g].count += usage;
+                    groupStats[g].emotions.push({ label: emotion.label, usage });
+                }
+            } else {
+                ungrouped.push({ label: emotion.label, usage });
+            }
+        }
+
+        // 라벨별 정렬
+        const sortedEmotions = [...charData.emotions].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+        const top = sortedEmotions.slice(0, 5);
+        const unused = charData.emotions.filter(e => !e.usageCount).map(e => e.label);
+
+        let html = `
+            <div style="margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.04); border-radius:6px;">
+                <b>${charName}</b> · 총 분석 ${totalUsage}회 · 등록 감정 ${charData.emotions.length}개
+            </div>
+        `;
+
+        if (totalUsage > 0) {
+            html += `<div style="margin-bottom:8px;"><b style="font-size:0.9em;">🔥 자주 쓰인 감정 (TOP 5)</b><br>`;
+            html += top.filter(e => (e.usageCount || 0) > 0).map(e => {
+                const pct = totalUsage > 0 ? Math.round((e.usageCount / totalUsage) * 100) : 0;
+                return `<div style="display:flex; align-items:center; gap:6px; margin:3px 0;">
+                    <span style="flex:1; font-size:0.88em;">${e.label}</span>
+                    <span style="font-size:0.8em; opacity:0.7;">${e.usageCount}회 (${pct}%)</span>
+                    <div style="width:60px; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                        <div style="height:100%; width:${pct}%; background:rgba(100,180,255,0.7);"></div>
+                    </div>
+                </div>`;
+            }).join("");
+            html += `</div>`;
+        }
+
+        if (Object.keys(groupStats).length > 0) {
+            html += `<div style="margin-bottom:8px;"><b style="font-size:0.9em;">📂 그룹별 사용</b><br>`;
+            const sortedGroups = Object.entries(groupStats).sort((a, b) => b[1].count - a[1].count);
+            html += sortedGroups.map(([g, data]) => {
+                const pct = totalUsage > 0 ? Math.round((data.count / totalUsage) * 100) : 0;
+                return `<div style="display:flex; align-items:center; gap:6px; margin:3px 0;">
+                    <span style="flex:1; font-size:0.88em;">${g} <span style="opacity:0.5; font-size:0.85em;">(${data.emotions.length}개)</span></span>
+                    <span style="font-size:0.8em; opacity:0.7;">${data.count}회 (${pct}%)</span>
+                    <div style="width:60px; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                        <div style="height:100%; width:${pct}%; background:rgba(180,140,255,0.7);"></div>
+                    </div>
+                </div>`;
+            }).join("");
+            html += `</div>`;
+        }
+
+        if (unused.length > 0) {
+            html += `<div style="margin-bottom:8px;"><b style="font-size:0.9em; opacity:0.7;">💤 한 번도 안 쓰인 감정 (${unused.length}개)</b><br>
+                <div style="font-size:0.82em; opacity:0.6; margin-top:3px;">${unused.join(", ")}</div>
+            </div>`;
+        }
+
+        contentEl.innerHTML = html;
+    }
+
+    $("#ds-stats-refresh").on("click", renderStats);
+    $("#ds-stats-reset").on("click", function () {
+        if (!confirm("모든 캐릭터의 사용 횟수를 0으로 초기화할까요?")) return;
+        for (const cn in settings.characters) {
+            for (const e of settings.characters[cn].emotions) {
+                e.usageCount = 0;
+            }
+        }
+        saveSettingsDebounced();
+        renderStats();
+        renderEmotionList();
+        toastr.success("사용 횟수 초기화됨");
+    });
+
+    // 통계 섹션 펼칠 때 자동 렌더
+    document.querySelector('[data-collapse-key="groups"] .ds-collapse-header')?.addEventListener("click", () => {
+        setTimeout(renderStats, 50);
+    });
+    renderStats();
+
     $("#ds-custom-prompt").on("change", function () {
         settings.customPrompt = this.value;
         saveSettingsDebounced();
@@ -2000,6 +2112,39 @@ function createSettingsPanel() {
     });
 
     updateApiFieldsVisibility();
+
+    // === Collapsible 섹션 초기화 ===
+    settings.collapsedSections = settings.collapsedSections || {};
+    document.querySelectorAll(".ds-collapsible").forEach(section => {
+        const key = section.dataset.collapseKey;
+        const header = section.querySelector(".ds-collapse-header");
+        const body = section.querySelector(".ds-collapse-body");
+        const arrow = section.querySelector(".ds-collapse-arrow");
+
+        // 초기 상태 적용
+        const collapsed = settings.collapsedSections[key] !== false; // 기본 접힘
+        if (collapsed) {
+            body.style.display = "none";
+            arrow.textContent = "▶";
+        } else {
+            body.style.display = "";
+            arrow.textContent = "▼";
+        }
+
+        header.addEventListener("click", () => {
+            const nowCollapsed = body.style.display === "none";
+            if (nowCollapsed) {
+                body.style.display = "";
+                arrow.textContent = "▼";
+                settings.collapsedSections[key] = false;
+            } else {
+                body.style.display = "none";
+                arrow.textContent = "▶";
+                settings.collapsedSections[key] = true;
+            }
+            saveSettingsDebounced();
+        });
+    });
 }
 
 // ====================================================================
@@ -2028,6 +2173,7 @@ jQuery(async () => {
         createSpriteContainer();
         applyDisplayStyles();
         createSettingsPanel();
+        addWandMenuItems();
 
         // origin이 바뀌어서 IndexedDB가 비어있는데 백업은 있는 경우 자동 복원
         try {
@@ -2049,3 +2195,148 @@ jQuery(async () => {
         console.error("[DynamicSprite] 초기화 실패:", err);
     }
 });
+
+// ====================================================================
+// 마술봉(Wand) 메뉴 - 빠른 토글 버튼들
+// ====================================================================
+function addWandMenuItems() {
+    const settings = extension_settings[extensionName];
+    const menuId = "extensionsMenu";
+    const menu = document.getElementById(menuId);
+    if (!menu) {
+        // ST가 아직 메뉴 안 만들었을 수 있음 - 재시도
+        setTimeout(addWandMenuItems, 500);
+        return;
+    }
+    // 이미 추가됐으면 패스
+    if (document.getElementById("ds-wand-toggle")) return;
+
+    // 1) 스프라이트 표시 ON/OFF 토글
+    const toggleItem = document.createElement("div");
+    toggleItem.id = "ds-wand-toggle";
+    toggleItem.className = "list-group-item flex-container flexGap5 interactable";
+    toggleItem.tabIndex = 0;
+    toggleItem.innerHTML = `
+        <div class="fa-solid fa-masks-theater extensionsMenuExtensionButton"></div>
+        <span id="ds-wand-toggle-label">${settings.showSprite ? "스프라이트 숨기기" : "스프라이트 표시"}</span>
+    `;
+    toggleItem.addEventListener("click", () => {
+        settings.showSprite = !settings.showSprite;
+        const img = document.getElementById("dynamic-sprite-img");
+        if (img) {
+            if (settings.showSprite) {
+                if (img.src) {
+                    img.style.display = "block";
+                    requestAnimationFrame(() => { img.style.opacity = "1"; });
+                }
+            } else {
+                img.style.opacity = "0";
+                setTimeout(() => { img.style.display = "none"; }, settings.transitionDuration || 300);
+            }
+        }
+        document.getElementById("ds-wand-toggle-label").textContent =
+            settings.showSprite ? "스프라이트 숨기기" : "스프라이트 표시";
+        // 설정 패널의 체크박스도 동기화
+        const cb = document.getElementById("ds-show-sprite");
+        if (cb) cb.checked = settings.showSprite;
+        saveSettingsDebounced();
+        toastr.info(settings.showSprite ? "스프라이트 표시" : "스프라이트 숨김", "", { timeOut: 1500 });
+    });
+    menu.appendChild(toggleItem);
+
+    // 2) 수동 감정 변경 (라벨 목록에서 선택)
+    const pickerItem = document.createElement("div");
+    pickerItem.id = "ds-wand-picker";
+    pickerItem.className = "list-group-item flex-container flexGap5 interactable";
+    pickerItem.tabIndex = 0;
+    pickerItem.innerHTML = `
+        <div class="fa-solid fa-face-smile extensionsMenuExtensionButton"></div>
+        <span>감정 수동 선택</span>
+    `;
+    pickerItem.addEventListener("click", () => {
+        showEmotionPickerPopup();
+    });
+    menu.appendChild(pickerItem);
+
+    // 3) 분석 일시 정지 토글
+    const pauseItem = document.createElement("div");
+    pauseItem.id = "ds-wand-pause";
+    pauseItem.className = "list-group-item flex-container flexGap5 interactable";
+    pauseItem.tabIndex = 0;
+    pauseItem.innerHTML = `
+        <div class="fa-solid fa-pause extensionsMenuExtensionButton"></div>
+        <span id="ds-wand-pause-label">${settings.enabled ? "감정 분석 정지" : "감정 분석 재개"}</span>
+    `;
+    pauseItem.addEventListener("click", () => {
+        settings.enabled = !settings.enabled;
+        document.getElementById("ds-wand-pause-label").textContent =
+            settings.enabled ? "감정 분석 정지" : "감정 분석 재개";
+        const cb = document.getElementById("ds-enabled");
+        if (cb) cb.checked = settings.enabled;
+        saveSettingsDebounced();
+        toastr.info(settings.enabled ? "감정 분석 켜짐" : "감정 분석 꺼짐", "", { timeOut: 1500 });
+    });
+    menu.appendChild(pauseItem);
+}
+
+// ====================================================================
+// 감정 수동 선택 팝업 (마술봉 메뉴에서 호출)
+// ====================================================================
+function showEmotionPickerPopup() {
+    const charName = getCurrentCharName();
+    if (!charName) {
+        toastr.warning("캐릭터를 선택하세요");
+        return;
+    }
+    const charData = getCharData(charName);
+    if (!charData.emotions || charData.emotions.length === 0) {
+        toastr.warning(`"${charName}"에 등록된 감정이 없습니다`);
+        return;
+    }
+
+    // 이미 떠있으면 제거
+    const existing = document.getElementById("ds-emotion-picker-popup");
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const popup = document.createElement("div");
+    popup.id = "ds-emotion-picker-popup";
+    popup.innerHTML = `
+        <div class="ds-picker-popup-header">
+            <span>감정 선택 — ${charName}</span>
+            <button class="ds-picker-popup-close">✕</button>
+        </div>
+        <div class="ds-picker-popup-grid">
+            ${charData.emotions.map(e => `
+                <button class="ds-picker-popup-item ${e.label === charData.current ? "ds-picker-popup-current" : ""}" data-label="${e.label}">
+                    ${e.label}
+                </button>
+            `).join("")}
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    popup.querySelectorAll(".ds-picker-popup-item").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const label = e.currentTarget.dataset.label;
+            updateSprite(label);
+            popup.remove();
+        });
+    });
+    popup.querySelector(".ds-picker-popup-close").addEventListener("click", () => {
+        popup.remove();
+    });
+
+    // 바깥 클릭 닫기
+    setTimeout(() => {
+        const closeOnOutside = (ev) => {
+            if (!popup.contains(ev.target)) {
+                popup.remove();
+                document.removeEventListener("click", closeOnOutside);
+            }
+        };
+        document.addEventListener("click", closeOnOutside);
+    }, 100);
+}
