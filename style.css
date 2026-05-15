@@ -1,21 +1,18 @@
 /* ====================================================================
-   Dynamic Sprite Emotion v4
+   Dynamic Sprite Emotion v5
+   위치/크기/투명도는 JS의 applyDisplayStyles()가 동적으로 주입
 ==================================================================== */
 
 #dynamic-sprite-container {
     position: fixed;
-    bottom: 0;
-    left: 20px;
-    z-index: 100;
     pointer-events: none;
-    height: 80vh;
     display: flex;
     align-items: flex-end;
+    /* bottom/left/right/height/z-index는 JS가 주입 */
 }
 
 #dynamic-sprite-img {
     max-height: 100%;
-    max-width: 400px;
     height: auto;
     width: auto;
     object-fit: contain;
@@ -23,11 +20,15 @@
     opacity: 0;
     display: none;
     transition: opacity 300ms ease;
+    /* max-width/opacity는 JS가 주입 */
 }
 
-@media (max-width: 768px) {
-    #dynamic-sprite-container { height: 50vh; left: 10px; }
-    #dynamic-sprite-img { max-width: 200px; }
+/* ====================================================================
+   설정 패널 - 슬라이더
+==================================================================== */
+.dynamic-sprites-settings .ds-slider {
+    width: 100%;
+    margin: 4px 0 8px;
 }
 
 /* ====================================================================
