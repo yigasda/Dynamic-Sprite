@@ -359,17 +359,12 @@ async function callGemini(prompt, apiKey, model) {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    const body = {
+        const body = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
             temperature: 0.3,
-            // 🔧 BUG FIX: Gemini 2.5는 reasoning 토큰을 먼저 쓰므로 넉넉히
-            maxOutputTokens: 500,
-            topP: 0.95,
-            // 🔧 BUG FIX: Gemini 2.5 Flash는 thinking 끌 수 있음 (속도/비용 절감)
-            thinkingConfig: {
-                thinkingBudget: 0
-            }
+            maxOutputTokens: 2000,
+            topP: 0.95
         },
         safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -428,7 +423,7 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
         model: model,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
-        max_tokens: 50
+        max_tokens: 2000
     };
 
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
