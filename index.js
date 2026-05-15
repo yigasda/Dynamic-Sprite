@@ -327,7 +327,6 @@ async function callSTApi(prompt) {
         quietPrompt: prompt,
         skipWIAN: true,
         quietToLoud: false,
-        quietImage: null,
         quietName: 'EmotionClassifier',
         responseLength: 50
     });
@@ -356,8 +355,14 @@ async function callSTProfile(prompt, profileName) {
             // 약간의 대기 (전환 안정화)
             await new Promise(r => setTimeout(r, 200));
 
-            // 본문 생성 함수 호출
-            const result = await context.generateQuietPrompt(prompt, false, false);
+            // 본문 생성 함수 호출 (skipWIAN으로 세계관/페르소나 차단)
+            const result = await context.generateQuietPrompt({
+                quietPrompt: prompt,
+                skipWIAN: true,
+                quietToLoud: false,
+                quietName: 'EmotionClassifier',
+                responseLength: 50
+            });
 
             return result;
         } finally {
