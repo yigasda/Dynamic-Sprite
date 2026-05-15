@@ -62,9 +62,11 @@
 ==================================================================== */
 #ds-emotion-picker-popup {
     position: fixed;
-    top: 50%;
+    /* top: 50% + translateY(-50%)가 모바일 ST에서 위로 튀어나가는 문제 회피
+       calc로 viewport 중앙 명시 */
+    top: calc(50vh - 150px);
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     z-index: 99999;
     background: rgba(20, 20, 28, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -79,6 +81,14 @@
     color: #fff;
     display: flex;
     flex-direction: column;
+}
+
+@media (max-width: 768px) {
+    #ds-emotion-picker-popup {
+        /* 모바일에서는 화면 중앙보다 약간 아래 (키보드/입력바 피하기) */
+        top: 20vh;
+        max-height: 60vh;
+    }
 }
 
 .ds-picker-popup-header {
