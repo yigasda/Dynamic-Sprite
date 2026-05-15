@@ -20,7 +20,82 @@
     opacity: 0;
     display: none;
     transition: opacity 300ms ease;
+    pointer-events: auto;
+    cursor: pointer;
     /* max-width/opacity는 JS가 주입 */
+}
+
+/* ====================================================================
+   수동 감정 선택 팝업
+==================================================================== */
+#ds-manual-picker {
+    position: fixed;
+    z-index: 99999;
+    background: rgba(20, 20, 28, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 320px;
+    min-width: 200px;
+    padding: 8px;
+    color: #fff;
+}
+
+.ds-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.ds-picker-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1em;
+    padding: 0 4px;
+    opacity: 0.6;
+}
+
+.ds-picker-close:hover {
+    opacity: 1;
+}
+
+.ds-picker-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.ds-picker-item {
+    flex: 1 1 auto;
+    min-width: 80px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 150ms ease;
+}
+
+.ds-picker-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.ds-picker-item.ds-picker-current {
+    background: rgba(100, 180, 255, 0.25);
+    border-color: rgba(100, 180, 255, 0.6);
 }
 
 /* ====================================================================
@@ -29,6 +104,46 @@
 .dynamic-sprites-settings .ds-slider {
     width: 100%;
     margin: 4px 0 8px;
+}
+
+/* ====================================================================
+   설정 패널 - alias 매니저
+==================================================================== */
+.ds-alias-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+.ds-alias-row input {
+    flex: 1;
+    font-size: 0.85em;
+}
+.ds-alias-arrow {
+    opacity: 0.5;
+    font-size: 0.9em;
+}
+
+/* ====================================================================
+   사용 횟수 뱃지
+==================================================================== */
+.ds-emotion-label-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.ds-usage-badge {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    background: rgba(100, 180, 255, 0.18);
+    color: rgba(100, 180, 255, 0.95);
+    border-radius: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.ds-usage-badge.ds-usage-zero {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.4);
 }
 
 /* ====================================================================
