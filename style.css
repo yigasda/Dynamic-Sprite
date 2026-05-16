@@ -608,14 +608,14 @@ body[data-ds-theme="peach"] #ds-emotion-picker-popup {
 /* ========== LILAC 테마 ========== */
 body[data-ds-theme="lilac"] #dynamic-sprites-settings,
 body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
-    --ds-bg: #f3eeff;
-    --ds-bg-elevated: #e6d9f7;
-    --ds-bg-card: #ede2fb;
-    --ds-text: #3b2660;
-    --ds-text-muted: rgba(59, 38, 96, 0.6);
-    --ds-accent: #8b5cf6;
-    --ds-accent-soft: rgba(139, 92, 246, 0.15);
-    --ds-border: rgba(59, 38, 96, 0.12);
+    --ds-bg: #f8e8ff;
+    --ds-bg-elevated: #ecd4f5;
+    --ds-bg-card: #f2dcfb;
+    --ds-text: #4a1a62;
+    --ds-text-muted: rgba(74, 26, 98, 0.6);
+    --ds-accent: #b04ec8;
+    --ds-accent-soft: rgba(176, 78, 200, 0.15);
+    --ds-border: rgba(74, 26, 98, 0.13);
     --ds-radius: 12px;
     --ds-radius-lg: 18px;
     --ds-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
@@ -688,21 +688,21 @@ body[data-ds-theme="mono"] #dynamic-sprites-settings .menu_button,
 body[data-ds-theme="cream"] #dynamic-sprites-settings .menu_button,
 body[data-ds-theme="peach"] #dynamic-sprites-settings .menu_button,
 body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button {
-    background: var(--ds-bg-elevated);
-    color: var(--ds-text);
-    border: 1px solid var(--ds-border);
-    border-radius: var(--ds-radius);
-    font-weight: var(--ds-font-weight-bold);
-    transition: all 150ms ease;
+    background: var(--ds-bg-elevated) !important;
+    color: var(--ds-text) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    font-weight: var(--ds-font-weight-bold) !important;
+    transition: all 150ms ease !important;
 }
 
 body[data-ds-theme="mono"] #dynamic-sprites-settings .menu_button:hover,
 body[data-ds-theme="cream"] #dynamic-sprites-settings .menu_button:hover,
 body[data-ds-theme="peach"] #dynamic-sprites-settings .menu_button:hover,
 body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button:hover {
-    background: var(--ds-accent-soft);
-    border-color: var(--ds-accent);
-    color: var(--ds-accent);
+    background: var(--ds-accent-soft) !important;
+    border-color: var(--ds-accent) !important;
+    color: var(--ds-accent) !important;
 }
 
 body[data-ds-theme="mono"] #dynamic-sprites-settings label,
@@ -816,21 +816,21 @@ body[data-ds-theme="mono"] .ds-picker-popup-item,
 body[data-ds-theme="cream"] .ds-picker-popup-item,
 body[data-ds-theme="peach"] .ds-picker-popup-item,
 body[data-ds-theme="lilac"] .ds-picker-popup-item {
-    background: var(--ds-bg-elevated);
-    color: var(--ds-text);
-    border: 1px solid var(--ds-border);
-    border-radius: var(--ds-radius);
-    font-weight: var(--ds-font-weight);
-    transition: all 150ms ease;
+    background: var(--ds-bg-elevated) !important;
+    color: var(--ds-text) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    font-weight: var(--ds-font-weight) !important;
+    transition: all 150ms ease !important;
 }
 
 body[data-ds-theme="mono"] .ds-picker-popup-item:hover,
 body[data-ds-theme="cream"] .ds-picker-popup-item:hover,
 body[data-ds-theme="peach"] .ds-picker-popup-item:hover,
 body[data-ds-theme="lilac"] .ds-picker-popup-item:hover {
-    background: var(--ds-accent-soft);
-    border-color: var(--ds-accent);
-    color: var(--ds-accent);
+    background: var(--ds-accent-soft) !important;
+    border-color: var(--ds-accent) !important;
+    color: var(--ds-accent) !important;
     transform: translateY(-1px);
 }
 
@@ -838,8 +838,8 @@ body[data-ds-theme="mono"] .ds-picker-popup-item.ds-picker-popup-current,
 body[data-ds-theme="cream"] .ds-picker-popup-item.ds-picker-popup-current,
 body[data-ds-theme="peach"] .ds-picker-popup-item.ds-picker-popup-current,
 body[data-ds-theme="lilac"] .ds-picker-popup-item.ds-picker-popup-current {
-    background: var(--ds-accent-soft);
-    border-color: var(--ds-accent);
-    color: var(--ds-accent);
-    font-weight: var(--ds-font-weight-bold);
+    background: var(--ds-accent-soft) !important;
+    border-color: var(--ds-accent) !important;
+    color: var(--ds-accent) !important;
+    font-weight: var(--ds-font-weight-bold) !important;
 }
