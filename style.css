@@ -996,8 +996,8 @@ body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button {
     box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
 }
 /* 각 테마 버튼 단색 */
-.ds-theme-btn[data-theme="system"] { background: #d4b8a0; }
-.ds-theme-btn[data-theme="mono"]   { background: #c0bfc8; }
-.ds-theme-btn[data-theme="cream"]  { background: #e0ceB4; }
-.ds-theme-btn[data-theme="peach"]  { background: #f4b8a2; }
-.ds-theme-btn[data-theme="lilac"]  { background: #d4b0e8; }
+.ds-theme-btn[data-theme="system"] { background: #e8a878; }
+.ds-theme-btn[data-theme="mono"]   { background: #a0a8b8; }
+.ds-theme-btn[data-theme="cream"]  { background: #f0d498; }
+.ds-theme-btn[data-theme="peach"]  { background: #f89880; }
+.ds-theme-btn[data-theme="lilac"]  { background: #c89ce0; }
