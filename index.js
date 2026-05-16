@@ -1051,13 +1051,8 @@ async function onMessageReceived(messageId) {
 // ====================================================================
 function extractEmotionFromFilename(filename) {
     let name = filename.replace(/\.(png|jpg|jpeg|webp|gif)$/i, "");
-    const hasSprPrefix = /^SPR_/i.test(name);
-    name = name.replace(/^SPR_/i, "");
-    const parts = name.split("_");
-    if (hasSprPrefix && parts.length > 1) {
-        // SPR_캐릭터명_라벨 형식 — 캐릭터명 제거
-        return parts.slice(1).join("_").toLowerCase();
-    }
+    // SPR_캐릭터명_라벨 형식이면 앞부분 제거, 아니면 파일명 전체가 라벨
+    name = name.replace(/^SPR_[^_]+_/i, "");
     return name.toLowerCase();
 }
 
