@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Sprite Emotion — NAI 연동 가이드</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0e0c14;
+    color: #c8b8e8;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    padding: 0 16px 80px;
+  }
+
+  .dse-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .dse-header {
+    padding: 56px 0 32px;
+    border-bottom: 1px solid rgba(183, 148, 210, 0.12);
+    margin-bottom: 40px;
+  }
+
+  .dse-badge-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  .dse-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .dse-badge-new {
+    background: rgba(120, 200, 150, 0.18);
+    color: #78c896;
+    border: 1px solid rgba(120, 200, 150, 0.3);
+  }
+
+  .dse-badge-ver {
+    background: rgba(183, 148, 210, 0.12);
+    color: #b794d2;
+    border: 1px solid rgba(183, 148, 210, 0.2);
+  }
+
+  .dse-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #e8d8ff;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+
+  .dse-subtitle {
+    color: #9080b0;
+    font-size: 0.95rem;
+  }
+
+  /* ── Sections ── */
+  .dse-section {
+    margin-bottom: 48px;
+  }
+
+  .dse-section-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #d4b8f0;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(183, 148, 210, 0.15);
+  }
+
+  p {
+    margin-bottom: 12px;
+    color: #b8a8d0;
+  }
+
+  /* ── Steps ── */
+  .dse-steps {
+    counter-reset: step;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .dse-steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .dse-steps li::before {
+    content: counter(step);
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(183, 148, 210, 0.15);
+    border: 1px solid rgba(183, 148, 210, 0.3);
+    color: #b794d2;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+  }
+
+  .dse-steps li .step-body {
+    flex: 1;
+  }
+
+  .dse-steps li .step-title {
+    font-weight: 600;
+    color: #d4b8f0;
+    margin-bottom: 4px;
+  }
+
+  .dse-steps li .step-desc {
+    color: #9080b0;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  /* ── Feature cards ── */
+  .dse-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .dse-feat {
+    background: rgba(183, 148, 210, 0.06);
+    border: 1px solid rgba(183, 148, 210, 0.12);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .dse-feat-icon {
+    font-size: 1.4rem;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .dse-feat-name {
+    font-weight: 600;
+    color: #d4b8f0;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+
+  .dse-feat-desc {
+    color: #807898;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  /* ── Code / inline ── */
+  code {
+    background: rgba(183, 148, 210, 0.12);
+    color: #d4a8ff;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.88em;
+  }
+
+  .dse-code-block {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(183, 148, 210, 0.12);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.85rem;
+    color: #c8b8e8;
+    overflow-x: auto;
+    margin: 12px 0;
+    white-space: pre;
+  }
+
+  /* ── Callout ── */
+  .dse-callout {
+    border-left: 3px solid #b794d2;
+    background: rgba(183, 148, 210, 0.08);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 16px 0;
+  }
+
+  .dse-callout p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #a090c0;
+  }
+
+  .dse-callout strong {
+    color: #c8a8e8;
+  }
+
+  /* ── Warning callout ── */
+  .dse-warn {
+    border-left: 3px solid #e08060;
+    background: rgba(224, 128, 96, 0.08);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 16px 0;
+  }
+
+  .dse-warn p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #c08070;
+  }
+
+  /* ── Table ── */
+  .dse-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 16px 0;
+  }
+
+  .dse-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: rgba(183, 148, 210, 0.1);
+    color: #c8a8e8;
+    border-bottom: 1px solid rgba(183, 148, 210, 0.15);
+    font-weight: 600;
+  }
+
+  .dse-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(183, 148, 210, 0.07);
+    color: #a090c0;
+    vertical-align: top;
+  }
+
+  .dse-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* ── Video ── */
+  .dse-video {
+    margin: 32px 0 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0e0c14;
+    border: 1px solid rgba(183, 148, 210, 0.15);
+  }
+
+  .dse-video video {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .dse-video-cap {
+    font-size: 0.78rem;
+    color: #807898;
+    font-family: Consolas, Monaco, monospace;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  /* ── Divider ── */
+  .dse-divider {
+    border: none;
+    border-top: 1px solid rgba(183, 148, 210, 0.1);
+    margin: 48px 0;
+  }
+</style>
+</head>
+<body>
+<div class="dse-wrap">
+
+  <!-- Header -->
+  <div class="dse-header">
+    <div class="dse-badge-row">
+      <span class="dse-badge dse-badge-new">NEW</span>
+      <span class="dse-badge dse-badge-ver">v1.2.0</span>
+    </div>
+    <h1 class="dse-title">NovelAI 이미지 생성 연동</h1>
+    <p class="dse-subtitle">Dynamic Sprite Emotion에 NAI 직접 연동 기능이 추가되었습니다.<br>캐릭터 표정 스프라이트를 AI로 자동 생성하고 즉시 등록할 수 있습니다.</p>
+  </div>
+
+  <!-- Demo video -->
+  <div class="dse-video">
+    <video src="https://pub-8db3c87c288c410fa340aeafb805be7c.r2.dev/post-videos/7fbe89be-dc26-46b8-9988-7201b8220fcc/86d3d25c-1e49-4e36-991a-0d10152ccf0d.mov" controls="" preload="metadata" playsinline=""></video>
+  </div>
+  <div class="dse-video-cap">DEMO — 표정 입력 → 생성 → 리스트 등록 → 배경 투명화</div>
+
+  <hr class="dse-divider">
+
+  <!-- 시작하기 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">시작하기</h2>
+    <ol class="dse-steps">
+      <li>
+        <div class="step-body">
+          <div class="step-title">NAI API 키 발급</div>
+          <p class="step-desc">novelai.net 로그인 → 우측 상단 프로필 → <strong>Account</strong> → <strong>Get Persistent API Token</strong>에서 키를 복사합니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">확장 설정 열기</div>
+          <p class="step-desc">SillyTavern 상단 Extensions 아이콘 → Dynamic Sprite Emotion → 캐릭터 선택 후 <strong>NAI 이미지 생성</strong> 섹션으로 이동합니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">API 키 입력 &amp; 캐릭터 프롬프트 설정</div>
+          <p class="step-desc">API 키를 붙여넣고, 캐릭터 베이스 프롬프트에 캐릭터의 외형을 입력합니다. (예: <code>1girl, silver hair, blue eyes, school uniform</code>)</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">표정 생성</div>
+          <p class="step-desc">단일 생성 칸에 표정 라벨명을 입력하고 <strong>🎨 생성</strong>을 클릭합니다. 생성된 이미지는 자동으로 스프라이트 리스트에 등록됩니다.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- 주요 기능 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">주요 기능</h2>
+    <div class="dse-features">
+      <div class="dse-feat">
+        <span class="dse-feat-icon">🎨</span>
+        <div class="dse-feat-name">단일 표정 생성</div>
+        <p class="dse-feat-desc">라벨명 하나로 표정 이미지를 즉시 생성해 스프라이트 리스트에 등록</p>
+      </div>
+      <div class="dse-feat">
+        <span class="dse-feat-icon">✂️</span>
+        <div class="dse-feat-name">배경 자동 제거</div>
+        <p class="dse-feat-desc">생성 후 흰 배경을 자동 투명화. BFS 알고리즘으로 흰 옷은 보존</p>
+      </div>
+      <div class="dse-feat">
+        <span class="dse-feat-icon">🔒</span>
+        <div class="dse-feat-name">시드 고정</div>
+        <p class="dse-feat-desc">동일 시드로 반복 생성해 표정마다 일관된 캐릭터 외형 유지</p>
+      </div>
+      <div class="dse-feat">
+        <span class="dse-feat-icon">⚡</span>
+        <div class="dse-feat-name">표정 가중치</div>
+        <p class="dse-feat-desc">NAI <code>N::label::</code> 태그로 표정 강도를 0.1~10 범위로 조절</p>
+      </div>
+      <div class="dse-feat">
+        <span class="dse-feat-icon">🔁</span>
+        <div class="dse-feat-name">자동 재시도</div>
+        <p class="dse-feat-desc">API 혼잡(429) 발생 시 8~32초 간격으로 최대 4회 자동 재시도</p>
+      </div>
+      <div class="dse-feat">
+        <span class="dse-feat-icon">🖼️</span>
+        <div class="dse-feat-name">모델 선택</div>
+        <p class="dse-feat-desc">nai-diffusion-4-5-full 등 NAI v4 모델 중 선택 가능</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설정 항목 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">설정 항목 상세</h2>
+
+    <table class="dse-table">
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>설명</th>
+          <th>기본값</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>API 키</strong></td>
+          <td>NAI Persistent API Token</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>모델</strong></td>
+          <td>사용할 NAI 이미지 모델</td>
+          <td>nai-diffusion-4-5-full</td>
+        </tr>
+        <tr>
+          <td><strong>캐릭터 베이스 프롬프트</strong></td>
+          <td>캐릭터 외형 설명. 생성되는 모든 표정에 공통 적용</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>네거티브 프롬프트</strong></td>
+          <td>제외할 요소. 빈 칸이면 NAI 기본 네거티브 사용</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>이미지 크기</strong></td>
+          <td>가로 × 세로 픽셀 (NAI 지원 해상도만 유효)</td>
+          <td>832 × 1216</td>
+        </tr>
+        <tr>
+          <td><strong>Steps</strong></td>
+          <td>샘플링 스텝 수. 높을수록 정밀하지만 느림</td>
+          <td>28</td>
+        </tr>
+        <tr>
+          <td><strong>Guidance (CFG)</strong></td>
+          <td>프롬프트 충실도. 낮으면 자유롭고 높으면 딱딱</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td><strong>Guidance Rescale</strong></td>
+          <td>CFG 보정값. 0이면 비활성화. 고CFG 시 색번짐 완화</td>
+          <td>0</td>
+        </tr>
+        <tr>
+          <td><strong>시드 고정</strong></td>
+          <td>ON 시 동일 시드로 생성해 캐릭터 외형 일관성 향상</td>
+          <td>OFF</td>
+        </tr>
+        <tr>
+          <td><strong>배경 제거</strong></td>
+          <td>생성 후 흰 배경을 자동 투명화</td>
+          <td>OFF</td>
+        </tr>
+        <tr>
+          <td><strong>배경 제거 임계값</strong></td>
+          <td>이 값 이상인 픽셀을 흰색으로 판단 (200–255)</td>
+          <td>240</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 단일 생성 & 가중치 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">단일 생성 &amp; 표정 가중치</h2>
+
+    <p>단일 생성 행은 <strong>가중치 칸</strong>과 <strong>라벨명 칸</strong> 두 개로 구성됩니다.</p>
+
+    <div class="dse-code-block">[ 2 ] [ hurt ] [ 🎨 생성 ]</div>
+
+    <p>입력한 라벨이 기본 표정 목록(smile, sad, angry…)에 없으면 NAI의 표정 태그 형식으로 자동 변환해 전송합니다:</p>
+
+    <div class="dse-code-block">가중치::라벨명::
+예) 2::hurt::</div>
+
+    <div class="dse-callout">
+      <p><strong>기본 표정 목록</strong> (smile, sad, angry, surprised, fear, disgust, neutral, happy, embarrassed, crying)은 최적화된 프롬프트로 전송됩니다. 그 외 라벨은 가중치 태그 방식으로 전송됩니다.</p>
+    </div>
+
+    <p>가중치 범위는 <strong>0.1 ~ 10</strong>이며 기본값은 2입니다. 값이 높을수록 해당 표정이 더 강하게 반영됩니다.</p>
+  </div>
+
+  <!-- 배경 제거 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">배경 제거 상세</h2>
+
+    <p>배경 제거 ON 상태에서 이미지를 생성하면 흰 배경이 자동으로 투명화됩니다.</p>
+
+    <p>내부적으로 <strong>BFS(너비 우선 탐색) 플러드 필</strong> 방식을 사용합니다. 이미지의 테두리 픽셀에서 시작해 연결된 흰 픽셀만 제거하므로, 캐릭터가 흰 옷을 입고 있어도 옷은 그대로 유지됩니다.</p>
+
+    <div class="dse-callout">
+      <p><strong>임계값</strong>을 낮추면(예: 220) 더 좁은 범위만 흰색으로 처리합니다. 배경이 완전히 제거되지 않는다면 값을 높이고, 옷이 같이 지워진다면 값을 낮추세요.</p>
+    </div>
+  </div>
+
+  <!-- 시드 고정 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">시드 고정 &amp; 일관성 유지</h2>
+
+    <p>시드 고정을 ON하면 모든 생성에 동일한 시드 번호가 사용됩니다. 같은 시드와 같은 베이스 프롬프트를 쓰면 포즈와 얼굴 형태가 비슷하게 유지되어 표정 세트의 통일감을 높일 수 있습니다.</p>
+
+    <p><strong>🎲 버튼</strong>을 누르면 랜덤 시드를 즉시 생성해 입력 칸에 채워줍니다.</p>
+
+    <div class="dse-warn">
+      <p>시드가 같아도 Steps, CFG, 프롬프트가 다르면 결과물이 달라질 수 있습니다. 표정 세트를 처음 생성할 때 마음에 드는 시드를 기록해두고 고정하는 것을 권장합니다.</p>
+    </div>
+  </div>
+
+  <!-- 주의사항 -->
+  <div class="dse-section">
+    <h2 class="dse-section-title">주의사항</h2>
+    <ol class="dse-steps">
+      <li>
+        <div class="step-body">
+          <div class="step-title">API 키는 저장 주의</div>
+          <p class="step-desc">API 키는 SillyTavern 설정 파일에 저장됩니다. 설정 파일을 공유하거나 업로드할 때 키가 포함되지 않도록 주의하세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">NAI 구독 필요</div>
+          <p class="step-desc">이미지 생성 API는 활성화된 NAI 구독이 있어야 사용할 수 있습니다. Anlas(포인트)가 소비됩니다.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <div class="step-title">동시 생성 제한</div>
+          <p class="step-desc">NAI는 계정당 동시 생성 1건을 허용합니다. 다른 탭에서 생성 중이면 429 오류가 발생하며, 확장이 자동으로 재시도합니다.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>
