@@ -635,7 +635,7 @@ async function generateSpriteForLabel(charName, label) {
     try {
         const { prompt, negativePrompt } = buildNaiPrompt(charName, label);
         if (!prompt) throw new Error("베이스 프롬프트를 먼저 입력하세요.");
-        const blob = await callNovelAIWithRetry(prompt, negativePrompt, settings.naiConfig);
+        const blob = await callNovelAIWithRetry(prompt, negativePrompt, extension_settings[extensionName].naiConfig);
         const file = new File([blob], `${label}.png`, { type: "image/png" });
         await addEmotion(file, label, charName);
         return true;
