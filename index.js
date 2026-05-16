@@ -1796,12 +1796,6 @@ function createSettingsPanel() {
                                 value="${settings.naiConfig?.removeBgThreshold ?? 240}" class="ds-slider">
                         </div>
 
-                        <label style="margin-top:8px;">미등록 라벨 표정 강도</label>
-                        <p class="ds-hint">DEFAULT_LABEL_PROMPTS에 없는 라벨에 적용 (예: 2 → <code>2::label::</code>)</p>
-                        <input type="number" id="ds-nai-label-intensity" class="text_pole"
-                            value="${settings.naiConfig?.labelIntensity ?? 2}" min="0.1" max="10" step="0.5"
-                            style="width:100px;">
-
                         <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
                         <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
 
@@ -1830,9 +1824,13 @@ function createSettingsPanel() {
                         <hr>
 
                         <label>단일 생성</label>
-                        <div style="display:flex; gap:6px;">
+                        <p class="ds-hint">첫 번째 칸은 표정 가중치 — 미등록 라벨에 <code>가중치::label::</code> 형태로 전송</p>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <input type="number" id="ds-nai-label-intensity" class="text_pole"
+                                value="${settings.naiConfig?.labelIntensity ?? 2}"
+                                min="0.1" max="10" step="0.5" style="width:64px; flex-shrink:0;">
                             <input type="text" id="ds-nai-quick-label" class="text_pole"
-                                placeholder="라벨명 (예: smile)" style="flex:1;">
+                                placeholder="라벨명 (예: hurt)" style="flex:1;">
                             <button id="ds-nai-quick-gen" class="menu_button">🎨 생성</button>
                         </div>
                         <div id="ds-nai-quick-result" style="margin-top:6px; font-size:0.85em; min-height:14px;"></div>
