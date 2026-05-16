@@ -524,9 +524,28 @@ async function removeWhiteBackground(blob, threshold = 240) {
     ctx.drawImage(bitmap, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const d = imageData.data;
-    for (let i = 0; i < d.length; i += 4) {
-        if (d[i] >= threshold && d[i + 1] >= threshold && d[i + 2] >= threshold) {
-            d[i + 3] = 0;
+    const w = canvas.width, h = canvas.height;
+    const visited = new Uint8Array(w * h);
+    const queue = [];
+
+    const isWhite = (i) => d[i] >= threshold && d[i + 1] >= threshold && d[i + 2] >= threshold;
+    const seed = (x, y) => {
+        const idx = y * w + x;
+        if (!visited[idx] && isWhite(idx * 4)) { visited[idx] = 1; queue.push(idx); }
+    };
+    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+    for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+
+    let qi = 0;
+    while (qi < queue.length) {
+        const idx = queue[qi++];
+        d[idx * 4 + 3] = 0;
+        const x = idx % w, y = (idx / w) | 0;
+        for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+            if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                const ni = ny * w + nx;
+                if (!visited[ni] && isWhite(ni * 4)) { visited[ni] = 1; queue.push(ni); }
+            }
         }
     }
     ctx.putImageData(imageData, 0, 0);
@@ -1809,26 +1828,6 @@ function createSettingsPanel() {
                             <button id="ds-nai-quick-gen" class="menu_button">🎨 생성</button>
                         </div>
                         <div id="ds-nai-quick-result" style="margin-top:6px; font-size:0.85em; min-height:14px;"></div>
-
-                        <hr>
-
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                            <label style="margin:0;">라벨별 표정 프롬프트</label>
-                            <button id="ds-nai-fill-defaults" class="menu_button" style="font-size:0.8em; padding:3px 8px;">기본값 채우기</button>
-                        </div>
-                        <p class="ds-hint">비워두면 내장 기본 프롬프트 자동 적용</p>
-                        <div id="ds-nai-label-prompts" style="margin-top:4px;"></div>
-
-                        <hr>
-
-                        <button id="ds-nai-gen-all" class="menu_button" style="width:100%;">⚡ 전체 라벨 일괄 생성</button>
-                        <div id="ds-nai-progress" style="display:none; margin-top:8px;">
-                            <div id="ds-nai-progress-text" style="font-size:0.85em; margin-bottom:4px;"></div>
-                            <div style="height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">
-                                <div id="ds-nai-progress-bar" style="height:100%; width:0%; background:rgba(150,100,220,0.7); transition:width 300ms ease;"></div>
-                            </div>
-                        </div>
-                        <div id="ds-nai-gen-status" style="font-size:0.83em; margin-top:6px; min-height:14px; line-height:1.5;"></div>
                     </div>
                 </div>
 
@@ -2681,7 +2680,6 @@ function createSettingsPanel() {
         try {
             await generateSpriteForLabel(charName, label);
             renderEmotionList();
-            renderNaiLabelPrompts(charName);
             if (resultEl) resultEl.textContent = `✅ "${label}" 생성 완료`;
             toastr.success(`"${label}" 생성 완료`);
         } catch (err) {
@@ -2728,7 +2726,6 @@ function createSettingsPanel() {
         const negEl = document.getElementById("ds-nai-neg-prompt");
         if (baseEl) baseEl.value = naiGen.basePrompt || "";
         if (negEl) negEl.value = naiGen.negativePrompt || "";
-        renderNaiLabelPrompts(charName);
     }
 
     $("#ds-nai-base-prompt").on("change", function () {
@@ -2747,61 +2744,6 @@ function createSettingsPanel() {
         if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
         cd.naiGen.negativePrompt = this.value.trim();
         saveSettingsDebounced();
-    });
-
-    $("#ds-nai-fill-defaults").on("click", function () {
-        const charName = getCurrentCharName();
-        if (!charName) return;
-        const cd = getCharData(charName);
-        if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
-        if (!cd.naiGen.labelPrompts) cd.naiGen.labelPrompts = {};
-        cd.emotions.forEach(e => {
-            if (DEFAULT_LABEL_PROMPTS[e.label]) {
-                cd.naiGen.labelPrompts[e.label] = DEFAULT_LABEL_PROMPTS[e.label];
-            }
-        });
-        saveSettingsDebounced();
-        renderNaiLabelPrompts(charName);
-        toastr.success("기본값으로 채웠습니다.");
-    });
-
-    $("#ds-nai-gen-all").on("click", async function () {
-        const charName = getCurrentCharName();
-        if (!charName) { toastr.warning("캐릭터를 먼저 선택하세요."); return; }
-        if (!settings.naiConfig?.apiKey) { toastr.warning("NAI API 키를 먼저 설정해주세요."); return; }
-
-        const progressEl = document.getElementById("ds-nai-progress");
-        const progressBar = document.getElementById("ds-nai-progress-bar");
-        const progressText = document.getElementById("ds-nai-progress-text");
-        const statusEl = document.getElementById("ds-nai-gen-status");
-        const btn = this;
-
-        btn.disabled = true;
-        progressEl.style.display = "block";
-        statusEl.innerHTML = "";
-        const log = [];
-
-        const results = await generateAllSprites(charName, (i, total, label) => {
-            const pct = total > 0 ? Math.round((i / total) * 100) : 100;
-            progressBar.style.width = pct + "%";
-            if (label) {
-                progressText.textContent = `생성 중 (${i + 1}/${total}): ${label}`;
-            } else {
-                progressText.textContent = `완료 (${total}/${total})`;
-            }
-        });
-
-        if (results) {
-            if (results.success.length) log.push(`✅ ${results.success.length}개 완료`);
-            if (results.failed.length) {
-                log.push(`❌ ${results.failed.length}개 실패: ${results.failed.map(f => f.label).join(", ")}`);
-            }
-            statusEl.innerHTML = log.join("<br>");
-            renderEmotionList();
-            toastr.success(`일괄 생성 완료 (${results.success.length}/${results.success.length + results.failed.length})`);
-        }
-
-        btn.disabled = false;
     });
 
     // NAI 섹션 열릴 때 + 초기 로드
