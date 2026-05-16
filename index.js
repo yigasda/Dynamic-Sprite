@@ -539,6 +539,123 @@ async function callNovelAI(prompt, negativePrompt, config) {
 }
 
 // ====================================================================
+// NAI 표정 생성 유틸
+// ====================================================================
+const DEFAULT_LABEL_PROMPTS = {
+    neutral:      "neutral expression, calm, looking at viewer",
+    smile:        "soft smile, gentle expression, looking at viewer",
+    happy:        "happy expression, bright smile, looking at viewer",
+    amused:       "amused, slight smile, eyes narrowed slightly",
+    sad:          "sad expression, downcast eyes, slight frown",
+    angry:        "angry, furrowed brows, intense glare",
+    surprised:    "surprised, wide eyes, slightly open mouth",
+    afraid:       "fearful expression, wide eyes, tense",
+    disgust:      "disgusted expression, slight frown, narrowed eyes",
+    contempt:     "contemptuous, sneering, looking to the side",
+    smirk:        "smirk, half smile, raised eyebrow",
+    tired:        "tired, half-lidded eyes, exhausted",
+    aloof:        "aloof, cold expression, looking away",
+    embarrassed:  "embarrassed, blushing, looking away",
+    confused:     "confused, slight frown, head tilted",
+    pain:         "pained expression, gritted teeth, eyes closed",
+    love:         "loving gaze, soft smile, blushing slightly",
+    determined:   "determined, focused, serious expression",
+    crying:       "crying, tears streaming, sad expression",
+    laughing:     "laughing, wide smile, eyes closed"
+};
+
+function buildNaiPrompt(charName, label) {
+    const charData = getCharData(charName);
+    const naiGen = charData.naiGen || {};
+    const base = (naiGen.basePrompt || "").trim();
+    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || label).trim();
+    const neg = (naiGen.negativePrompt || "").trim()
+        || "lowres, bad anatomy, bad hands, text, error, extra digit, fewer digits, worst quality, low quality";
+    const parts = [base, labelExtra, "masterpiece, best quality"].filter(Boolean);
+    return { prompt: parts.join(", "), negativePrompt: neg };
+}
+
+let naiGenerating = false;
+
+async function generateSpriteForLabel(charName, label) {
+    if (naiGenerating) {
+        toastr.warning("이미 생성 중입니다. 완료 후 시도하세요.");
+        return false;
+    }
+    naiGenerating = true;
+    try {
+        const { prompt, negativePrompt } = buildNaiPrompt(charName, label);
+        if (!prompt) throw new Error("베이스 프롬프트를 먼저 입력하세요.");
+        const blob = await callNovelAI(prompt, negativePrompt, settings.naiConfig);
+        const file = new File([blob], `${label}.png`, { type: "image/png" });
+        await addEmotion(file, label, charName);
+        return true;
+    } catch (err) {
+        console.error(`[NAI Gen] ${label} 실패:`, err);
+        throw err;
+    } finally {
+        naiGenerating = false;
+    }
+}
+
+async function generateAllSprites(charName, onProgress) {
+    const charData = getCharData(charName);
+    if (charData.emotions.length === 0) {
+        toastr.warning("생성할 라벨이 없습니다. 먼저 감정 라벨을 등록하세요.");
+        return null;
+    }
+    const labels = charData.emotions.map(e => e.label);
+    const results = { success: [], failed: [] };
+    for (let i = 0; i < labels.length; i++) {
+        const label = labels[i];
+        onProgress?.(i, labels.length, label);
+        try {
+            await generateSpriteForLabel(charName, label);
+            results.success.push(label);
+        } catch (err) {
+            results.failed.push({ label, error: err.message });
+        }
+        if (i < labels.length - 1) await new Promise(r => setTimeout(r, 1000));
+    }
+    onProgress?.(labels.length, labels.length, null);
+    return results;
+}
+
+function renderNaiLabelPrompts(charName) {
+    const container = document.getElementById("ds-nai-label-prompts");
+    if (!container) return;
+    const charData = getCharData(charName);
+    const labelPrompts = charData.naiGen?.labelPrompts || {};
+
+    if (charData.emotions.length === 0) {
+        container.innerHTML = `<div class="ds-hint">등록된 감정 라벨 없음</div>`;
+        return;
+    }
+    container.innerHTML = charData.emotions.map(e => `
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+            <span style="min-width:80px; font-size:0.85em; flex-shrink:0;">${e.label}</span>
+            <input type="text" class="text_pole ds-nai-lp-input" data-label="${e.label}"
+                value="${(labelPrompts[e.label] || "").replace(/"/g, "&quot;")}"
+                placeholder="${DEFAULT_LABEL_PROMPTS[e.label] || e.label + " expression, ..."}">
+        </div>
+    `).join("");
+
+    container.querySelectorAll(".ds-nai-lp-input").forEach(input => {
+        input.addEventListener("change", () => {
+            const cd = getCharData(charName);
+            if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
+            if (!cd.naiGen.labelPrompts) cd.naiGen.labelPrompts = {};
+            if (input.value.trim()) {
+                cd.naiGen.labelPrompts[input.dataset.label] = input.value.trim();
+            } else {
+                delete cd.naiGen.labelPrompts[input.dataset.label];
+            }
+            saveSettingsDebounced();
+        });
+    });
+}
+
+// ====================================================================
 // ST API 호출
 // ====================================================================
 async function callSTApi(prompt) {
@@ -1151,6 +1268,7 @@ function renderEmotionList() {
                         style="font-size:0.82em; margin-top:2px;">
                 </div>
                 <div class="ds-emotion-actions">
+                    <button class="menu_button ds-nai-gen-one" data-char="${charName}" data-label="${emotion.label}" title="NAI로 이미지 생성">🎨</button>
                     <button class="menu_button ds-delete-btn" data-char="${charName}" data-idx="${idx}" title="삭제">🗑</button>
                 </div>
             `;
@@ -1228,6 +1346,30 @@ function renderEmotionList() {
             settings.characters[cn].emotions.splice(idx, 1);
             saveSettingsDebounced();
             renderEmotionList();
+        });
+    });
+
+    // NAI 단일 생성
+    listEl.querySelectorAll(".ds-nai-gen-one").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            const cn = e.currentTarget.dataset.char;
+            const label = e.currentTarget.dataset.label;
+            if (!settings.naiConfig?.apiKey) {
+                toastr.warning("NAI API 키를 먼저 설정해주세요.");
+                return;
+            }
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "⏳";
+            try {
+                await generateSpriteForLabel(cn, label);
+                renderEmotionList();
+                toastr.success(`"${label}" 생성 완료`);
+            } catch (err) {
+                toastr.error(`생성 실패: ${err.message}`);
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
         });
     });
 }
@@ -1525,6 +1667,37 @@ function createSettingsPanel() {
 
                         <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
                         <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
+
+                        <hr>
+
+                        <label>현재 캐릭터 베이스 프롬프트</label>
+                        <p class="ds-hint">캐릭터 고정 외모/의상. 예: <code>1girl, white hair, blue eyes, school uniform</code></p>
+                        <textarea id="ds-nai-base-prompt" class="text_pole" rows="3"
+                            placeholder="1girl, ..."></textarea>
+
+                        <label>네거티브 프롬프트</label>
+                        <textarea id="ds-nai-neg-prompt" class="text_pole" rows="2"
+                            placeholder="lowres, bad anatomy, ... (비워두면 기본값 사용)"></textarea>
+
+                        <hr>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <label style="margin:0;">라벨별 표정 프롬프트</label>
+                            <button id="ds-nai-fill-defaults" class="menu_button" style="font-size:0.8em; padding:3px 8px;">기본값 채우기</button>
+                        </div>
+                        <p class="ds-hint">비워두면 내장 기본 프롬프트 자동 적용</p>
+                        <div id="ds-nai-label-prompts" style="margin-top:4px;"></div>
+
+                        <hr>
+
+                        <button id="ds-nai-gen-all" class="menu_button" style="width:100%;">⚡ 전체 라벨 일괄 생성</button>
+                        <div id="ds-nai-progress" style="display:none; margin-top:8px;">
+                            <div id="ds-nai-progress-text" style="font-size:0.85em; margin-bottom:4px;"></div>
+                            <div style="height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">
+                                <div id="ds-nai-progress-bar" style="height:100%; width:0%; background:rgba(150,100,220,0.7); transition:width 300ms ease;"></div>
+                            </div>
+                        </div>
+                        <div id="ds-nai-gen-status" style="font-size:0.83em; margin-top:6px; min-height:14px; line-height:1.5;"></div>
                     </div>
                 </div>
 
@@ -2243,6 +2416,7 @@ function createSettingsPanel() {
                     toastr.info(`캐릭터 변경: ${charName}`, "", { timeOut: 1500 });
                 }
                 lastNotifiedChar = charName;
+                syncNaiCharUI?.();
             }
         }, 300);
     });
@@ -2310,6 +2484,97 @@ function createSettingsPanel() {
             btn.prop("disabled", false);
         }
     });
+
+    // === NAI 캐릭터 프롬프트 핸들러 ===
+    function syncNaiCharUI() {
+        const charName = getCurrentCharName();
+        if (!charName) return;
+        const charData = getCharData(charName);
+        const naiGen = charData.naiGen || {};
+        const baseEl = document.getElementById("ds-nai-base-prompt");
+        const negEl = document.getElementById("ds-nai-neg-prompt");
+        if (baseEl) baseEl.value = naiGen.basePrompt || "";
+        if (negEl) negEl.value = naiGen.negativePrompt || "";
+        renderNaiLabelPrompts(charName);
+    }
+
+    $("#ds-nai-base-prompt").on("change", function () {
+        const charName = getCurrentCharName();
+        if (!charName) return;
+        const cd = getCharData(charName);
+        if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
+        cd.naiGen.basePrompt = this.value.trim();
+        saveSettingsDebounced();
+    });
+
+    $("#ds-nai-neg-prompt").on("change", function () {
+        const charName = getCurrentCharName();
+        if (!charName) return;
+        const cd = getCharData(charName);
+        if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
+        cd.naiGen.negativePrompt = this.value.trim();
+        saveSettingsDebounced();
+    });
+
+    $("#ds-nai-fill-defaults").on("click", function () {
+        const charName = getCurrentCharName();
+        if (!charName) return;
+        const cd = getCharData(charName);
+        if (!cd.naiGen) cd.naiGen = { basePrompt: "", negativePrompt: "", labelPrompts: {} };
+        if (!cd.naiGen.labelPrompts) cd.naiGen.labelPrompts = {};
+        cd.emotions.forEach(e => {
+            if (DEFAULT_LABEL_PROMPTS[e.label]) {
+                cd.naiGen.labelPrompts[e.label] = DEFAULT_LABEL_PROMPTS[e.label];
+            }
+        });
+        saveSettingsDebounced();
+        renderNaiLabelPrompts(charName);
+        toastr.success("기본값으로 채웠습니다.");
+    });
+
+    $("#ds-nai-gen-all").on("click", async function () {
+        const charName = getCurrentCharName();
+        if (!charName) { toastr.warning("캐릭터를 먼저 선택하세요."); return; }
+        if (!settings.naiConfig?.apiKey) { toastr.warning("NAI API 키를 먼저 설정해주세요."); return; }
+
+        const progressEl = document.getElementById("ds-nai-progress");
+        const progressBar = document.getElementById("ds-nai-progress-bar");
+        const progressText = document.getElementById("ds-nai-progress-text");
+        const statusEl = document.getElementById("ds-nai-gen-status");
+        const btn = this;
+
+        btn.disabled = true;
+        progressEl.style.display = "block";
+        statusEl.innerHTML = "";
+        const log = [];
+
+        const results = await generateAllSprites(charName, (i, total, label) => {
+            const pct = total > 0 ? Math.round((i / total) * 100) : 100;
+            progressBar.style.width = pct + "%";
+            if (label) {
+                progressText.textContent = `생성 중 (${i + 1}/${total}): ${label}`;
+            } else {
+                progressText.textContent = `완료 (${total}/${total})`;
+            }
+        });
+
+        if (results) {
+            if (results.success.length) log.push(`✅ ${results.success.length}개 완료`);
+            if (results.failed.length) {
+                log.push(`❌ ${results.failed.length}개 실패: ${results.failed.map(f => f.label).join(", ")}`);
+            }
+            statusEl.innerHTML = log.join("<br>");
+            renderEmotionList();
+            toastr.success(`일괄 생성 완료 (${results.success.length}/${results.success.length + results.failed.length})`);
+        }
+
+        btn.disabled = false;
+    });
+
+    // NAI 섹션 열릴 때 + 초기 로드
+    document.querySelector('[data-collapse-key="naiGen"] .ds-collapse-header')
+        ?.addEventListener("click", () => setTimeout(syncNaiCharUI, 50));
+    syncNaiCharUI();
 
     updateApiFieldsVisibility();
 
