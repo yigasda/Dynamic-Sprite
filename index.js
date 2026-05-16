@@ -41,6 +41,13 @@ const defaultSettings = {
     // === 표시 설정 프리셋 (이름 → 설정 스냅샷) ===
     displayPresets: {},
 
+    // === 캐릭터별 자동 프리셋 매핑 ===
+    // { charName: presetName } - 캐릭터 바꾸면 자동으로 프리셋 적용
+    characterPresetMap: {},
+
+    // === 캐릭터 변경 시 알림 ===
+    notifyCharChange: true,
+
     // === 사용자 정의 감정 별칭 ===
     // { "synonymWord": "canonicalLabel" } 형식
     // 예: { "ecstatic": "happy" } → AI가 "ecstatic" 뱉으면 "happy" 라벨로 매칭
@@ -67,8 +74,8 @@ const defaultSettings = {
         mobileDisplay: true,
         presets: true,
         compress: true,
-        alias: true,
-        groups: true
+        groups: true,
+        charPreset: true
     }
 };
 
@@ -1371,17 +1378,15 @@ function createSettingsPanel() {
 
                 <hr>
 
-                <div class="ds-section ds-collapsible" data-collapse-key="alias">
-                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🔀 감정 별칭 (Alias)</h4>
+                <div class="ds-section ds-collapsible" data-collapse-key="charPreset">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🎭 캐릭터별 자동 프리셋</h4>
                     <div class="ds-collapse-body">
-                        <p class="ds-hint">AI가 등록된 라벨과 다른 단어를 뱉을 때 의미가 같은 라벨로 자동 매칭. 빌트인 매핑(happy/joy/glad 등 약 80개)은 자동 적용됨. 여기서 추가 매핑 등록 가능.</p>
-                        <div id="ds-alias-list" style="margin-bottom:6px;"></div>
-                        <div class="ds-alias-row">
-                            <input type="text" id="ds-alias-from" class="text_pole" placeholder="AI가 말할 단어 (예: ecstatic)">
-                            <span class="ds-alias-arrow">→</span>
-                            <input type="text" id="ds-alias-to" class="text_pole" placeholder="매핑할 등록 라벨 (예: happy)">
-                            <button id="ds-alias-add" class="menu_button">+</button>
-                        </div>
+                        <p class="ds-hint">캐릭터를 바꾸면 등록된 프리셋이 자동 적용됩니다. 캐릭터마다 다른 위치/크기 쓸 때 편리합니다.</p>
+                        <label class="checkbox_label">
+                            <input id="ds-notify-char-change" type="checkbox" ${settings.notifyCharChange !== false ? "checked" : ""}>
+                            <span>캐릭터 변경 시 알림 표시</span>
+                        </label>
+                        <div id="ds-char-preset-list" style="margin-top:8px;"></div>
                     </div>
                 </div>
 
@@ -1717,6 +1722,7 @@ function createSettingsPanel() {
         saveSettingsDebounced();
         nameInput.value = "";
         renderPresetList();
+        renderCharPresetList();
         toastr.success(`"${name}" 프리셋 저장됨`);
     });
 
@@ -1767,52 +1773,66 @@ function createSettingsPanel() {
     bindDisplaySlider("ds-compress-maxdim", "ds-compress-maxdim-val", "compressMaxDim");
     bindDisplaySlider("ds-compress-quality", "ds-compress-quality-val", "compressQuality");
 
-    // === alias 매니저 ===
-    function renderAliasList() {
-        const listEl = document.getElementById("ds-alias-list");
+    // === 캐릭터별 자동 프리셋 매핑 ===
+    function renderCharPresetList() {
+        const listEl = document.getElementById("ds-char-preset-list");
         if (!listEl) return;
-        settings.userAliases = settings.userAliases || {};
-        const entries = Object.entries(settings.userAliases);
-        if (entries.length === 0) {
-            listEl.innerHTML = `<div class="ds-hint">사용자 추가 별칭 없음 (빌트인 매핑은 항상 작동)</div>`;
+        settings.characterPresetMap = settings.characterPresetMap || {};
+        settings.displayPresets = settings.displayPresets || {};
+
+        const allChars = Object.keys(settings.characters).filter(n =>
+            settings.characters[n].emotions.length > 0
+        ).sort();
+        const presetNames = Object.keys(settings.displayPresets);
+
+        if (allChars.length === 0) {
+            listEl.innerHTML = `<div class="ds-hint">등록된 캐릭터 없음</div>`;
             return;
         }
-        listEl.innerHTML = entries.map(([from, to]) => `
-            <div class="ds-alias-row" style="background:rgba(255,255,255,0.04); padding:4px 8px; border-radius:4px;">
-                <span style="flex:1;">${from}</span>
-                <span class="ds-alias-arrow">→</span>
-                <span style="flex:1;">${to}</span>
-                <button class="menu_button ds-alias-del" data-from="${from}" style="padding:2px 6px;">🗑️</button>
-            </div>
-        `).join("");
-        listEl.querySelectorAll(".ds-alias-del").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-                const from = e.currentTarget.dataset.from;
-                delete settings.userAliases[from];
+        if (presetNames.length === 0) {
+            listEl.innerHTML = `<div class="ds-hint">먼저 표시 설정 프리셋을 만들어주세요</div>`;
+            return;
+        }
+
+        listEl.innerHTML = allChars.map(charName => {
+            const current = settings.characterPresetMap[charName] || "";
+            const options = `<option value="">— 사용 안 함 —</option>` +
+                presetNames.map(name =>
+                    `<option value="${name}" ${name === current ? "selected" : ""}>${name}</option>`
+                ).join("");
+            return `
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+                    <span style="flex:1; font-size:0.9em;">${charName}</span>
+                    <span style="opacity:0.4;">→</span>
+                    <select class="text_pole ds-char-preset-select" data-char="${charName}" style="flex:1.5; font-size:0.85em;">${options}</select>
+                </div>
+            `;
+        }).join("");
+
+        listEl.querySelectorAll(".ds-char-preset-select").forEach(sel => {
+            sel.addEventListener("change", (e) => {
+                const charName = e.currentTarget.dataset.char;
+                const presetName = e.currentTarget.value;
+                if (presetName) {
+                    settings.characterPresetMap[charName] = presetName;
+                } else {
+                    delete settings.characterPresetMap[charName];
+                }
                 saveSettingsDebounced();
-                renderAliasList();
             });
         });
     }
 
-    $("#ds-alias-add").on("click", function () {
-        const fromEl = document.getElementById("ds-alias-from");
-        const toEl = document.getElementById("ds-alias-to");
-        const from = fromEl.value.trim().toLowerCase();
-        const to = toEl.value.trim().toLowerCase();
-        if (!from || !to) {
-            toastr.warning("양쪽 다 입력해주세요");
-            return;
-        }
-        settings.userAliases = settings.userAliases || {};
-        settings.userAliases[from] = to;
+    $("#ds-notify-char-change").on("change", function () {
+        settings.notifyCharChange = $(this).prop("checked");
         saveSettingsDebounced();
-        fromEl.value = "";
-        toEl.value = "";
-        renderAliasList();
     });
 
-    renderAliasList();
+    document.querySelector('[data-collapse-key="charPreset"] .ds-collapse-header')?.addEventListener("click", () => {
+        setTimeout(renderCharPresetList, 50);
+    });
+
+    renderCharPresetList();
 
     // === 통계 / 그룹별 사용 ===
     function renderStats() {
@@ -2107,8 +2127,32 @@ function createSettingsPanel() {
         this.value = "";
     });
 
+    let lastNotifiedChar = null;
     eventSource.on(event_types.CHAT_CHANGED, () => {
-        setTimeout(renderEmotionList, 300);
+        setTimeout(() => {
+            renderEmotionList();
+            renderCharPresetList();
+
+            const charName = getCurrentCharName();
+            if (charName && charName !== lastNotifiedChar) {
+                const mappedPreset = settings.characterPresetMap?.[charName];
+                if (mappedPreset && settings.displayPresets?.[mappedPreset]) {
+                    const preset = settings.displayPresets[mappedPreset];
+                    for (const k of DISPLAY_KEYS) {
+                        if (preset[k] !== undefined) settings[k] = preset[k];
+                    }
+                    applyDisplayStyles();
+                    syncDisplayUI();
+                    saveSettingsDebounced();
+                    if (settings.notifyCharChange) {
+                        toastr.info(`"${charName}" → 프리셋 "${mappedPreset}" 자동 적용`, "", { timeOut: 2000 });
+                    }
+                } else if (settings.notifyCharChange && lastNotifiedChar !== null) {
+                    toastr.info(`캐릭터 변경: ${charName}`, "", { timeOut: 1500 });
+                }
+                lastNotifiedChar = charName;
+            }
+        }, 300);
     });
 
     updateApiFieldsVisibility();
