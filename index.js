@@ -2738,9 +2738,9 @@ function createSettingsPanel() {
 
             const url = URL.createObjectURL(imageBlob);
             resultEl.html(`
-                ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)
-                &nbsp;|&nbsp; seed: <code>${usedSeed}</code>
-                <button class="menu_button ds-pin-seed" data-seed="${usedSeed}" style="margin-left:6px; padding:1px 6px; font-size:0.85em;">이 시드 고정</button><br>
+                ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)<br>
+                <span style="font-size:0.9em;">seed: <b>${usedSeed}</b>
+                <button class="menu_button ds-pin-seed" data-seed="${usedSeed}" style="margin-left:6px; padding:1px 8px; font-size:0.82em; height:auto;">이 시드 고정</button></span><br>
                 <img src="${url}" style="max-width:200px; border-radius:6px; margin-top:8px;">
             `);
             resultEl.find(".ds-pin-seed").on("click", function () {
