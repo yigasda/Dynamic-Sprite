@@ -631,41 +631,41 @@ async function callNovelAIWithRetry(prompt, negativePrompt, config, { maxRetries
 // NAI 표정 생성 유틸
 // ====================================================================
 const DEFAULT_LABEL_PROMPTS = {
-    neutral:      "{{neutral expression}}, calm face, relaxed, looking at viewer",
-    smile:        "{{soft smile}}, gentle expression, warm look, looking at viewer",
-    happy:        "{{happy expression}}, {{bright smile}}, joyful, looking at viewer",
-    amused:       "{{amused expression}}, slight smile, eyes narrowed playfully",
-    sad:          "{{sad expression}}, downcast eyes, slight frown, melancholic",
-    angry:        "{{angry expression}}, {{furrowed brows}}, intense glare",
-    surprised:    "{{surprised expression}}, {{wide eyes}}, slightly open mouth, shocked",
-    afraid:       "{{fearful expression}}, {{wide eyes}}, trembling, tense, scared",
-    disgust:      "{{disgusted expression}}, slight frown, narrowed eyes, repulsed",
-    contempt:     "{{contemptuous expression}}, sneering, cold gaze, looking to the side",
-    smirk:        "{{smirk}}, half smile, raised eyebrow, confident",
-    tired:        "{{tired expression}}, {{half-lidded eyes}}, exhausted, sleepy",
-    aloof:        "{{aloof expression}}, cold face, distant gaze, looking away",
-    embarrassed:  "{{embarrassed}}, {{blushing}}, looking away, flustered",
-    confused:     "{{confused expression}}, slight frown, head tilted, puzzled",
-    pain:         "{{pained expression}}, {{gritted teeth}}, eyes closed tightly, agonized",
-    love:         "{{loving gaze}}, {{soft smile}}, blushing, adoring look",
-    determined:   "{{determined expression}}, focused, serious, resolute gaze",
-    crying:       "{{crying}}, {{tears streaming down face}}, {{sobbing}}, red eyes, sad expression",
-    laughing:     "{{laughing}}, {{wide smile}}, eyes closed from laughter, delighted",
-    bored:        "{{bored expression}}, unimpressed, flat look, listless",
-    shocked:      "{{shocked expression}}, {{wide eyes}}, mouth agape, startled",
-    nervous:      "{{nervous}}, anxious expression, fidgety, uneasy",
-    excited:      "{{excited expression}}, bright eyes, eager smile, energetic",
-    calm:         "{{calm expression}}, serene, composed, relaxed face",
-    pensive:      "{{pensive expression}}, thoughtful, gazing into distance",
-    proud:        "{{proud expression}}, confident smile, chin up",
-    worried:      "{{worried expression}}, furrowed brows, anxious gaze",
-    shy:          "{{shy expression}}, {{blushing}}, eyes averted, reserved",
-    playful:      "{{playful expression}}, mischievous grin, bright eyes",
-    hurt:         "{{hurt expression}}, pained eyes, quivering lip, wounded",
-    suspicious:   "{{suspicious expression}}, narrowed eyes, skeptical look",
-    disappointed: "{{disappointed expression}}, downcast, dejected",
-    cold:         "{{cold expression}}, icy glare, detached",
-    gentle:       "{{gentle expression}}, soft eyes, warm and caring look",
+    neutral:      "calm face, relaxed, looking at viewer",
+    smile:        "gentle expression, warm look, looking at viewer",
+    happy:        "bright smile, joyful, looking at viewer",
+    amused:       "slight smile, eyes narrowed playfully",
+    sad:          "downcast eyes, slight frown, melancholic",
+    angry:        "furrowed brows, intense glare",
+    surprised:    "wide eyes, slightly open mouth, shocked",
+    afraid:       "wide eyes, trembling, tense, scared",
+    disgust:      "slight frown, narrowed eyes, repulsed",
+    contempt:     "sneering, cold gaze, looking to the side",
+    smirk:        "half smile, raised eyebrow, confident",
+    tired:        "half-lidded eyes, exhausted, sleepy",
+    aloof:        "cold face, distant gaze, looking away",
+    embarrassed:  "blushing, looking away, flustered",
+    confused:     "slight frown, head tilted, puzzled",
+    pain:         "gritted teeth, eyes closed tightly, agonized",
+    love:         "soft smile, blushing, adoring look",
+    determined:   "focused, serious, resolute gaze",
+    crying:       "tears streaming down face, sobbing, red eyes, sad expression",
+    laughing:     "wide smile, eyes closed from laughter, delighted",
+    bored:        "unimpressed, flat look, listless",
+    shocked:      "wide eyes, mouth agape, startled",
+    nervous:      "anxious expression, fidgety, uneasy",
+    excited:      "bright eyes, eager smile, energetic",
+    calm:         "serene, composed, relaxed face",
+    pensive:      "thoughtful, gazing into distance",
+    proud:        "confident smile, chin up",
+    worried:      "furrowed brows, anxious gaze",
+    shy:          "blushing, eyes averted, reserved",
+    playful:      "mischievous grin, bright eyes",
+    hurt:         "pained eyes, quivering lip, wounded",
+    suspicious:   "narrowed eyes, skeptical look",
+    disappointed: "downcast, dejected",
+    cold:         "icy glare, detached",
+    gentle:       "soft eyes, warm and caring look",
 };
 
 function buildNaiPrompt(charName, label) {
@@ -675,7 +675,12 @@ function buildNaiPrompt(charName, label) {
     const style    = (cfg.naiConfig?.stylePrompt  || "").trim();
     const base     = (naiGen.basePrompt || "").trim();
     const intensity = cfg.naiConfig?.labelIntensity ?? 2;
-    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `${intensity}::${label}::`).trim();
+    const defaultDesc = DEFAULT_LABEL_PROMPTS[label];
+    const labelExtra = (
+        naiGen.labelPrompts?.[label] ||
+        (defaultDesc ? `${intensity}::${label}::, ${defaultDesc}` : null) ||
+        `${intensity}::${label}::`
+    ).trim();
     const styleNeg = (cfg.naiConfig?.styleNegPrompt || "").trim();
     const charNeg  = (naiGen.negativePrompt || "").trim();
     const defaultNeg = "lowres, bad anatomy, bad hands, text, error, extra digit, worst quality, low quality";
