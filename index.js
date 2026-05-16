@@ -606,7 +606,8 @@ async function callNovelAI(prompt, negativePrompt, config) {
     }
 
     const arrayBuffer = await res.arrayBuffer();
-    return await extractImageFromNaiZip(arrayBuffer);
+    const blob = await extractImageFromNaiZip(arrayBuffer);
+    return { blob, seed };
 }
 
 async function callNovelAIWithRetry(prompt, negativePrompt, config, { maxRetries = 4, baseDelay = 8000 } = {}) {
@@ -700,14 +701,14 @@ async function generateSpriteForLabel(charName, label) {
     try {
         const { prompt, negativePrompt } = buildNaiPrompt(charName, label);
         if (!prompt) throw new Error("베이스 프롬프트를 먼저 입력하세요.");
-        const blob = await callNovelAIWithRetry(prompt, negativePrompt, extension_settings[extensionName].naiConfig);
+        const { blob, seed: usedSeed } = await callNovelAIWithRetry(prompt, negativePrompt, extension_settings[extensionName].naiConfig);
         const naiCfg = extension_settings[extensionName].naiConfig;
         const finalBlob = naiCfg.autoRemoveBg
             ? await removeWhiteBackground(blob, naiCfg.removeBgThreshold ?? 240)
             : blob;
         const file = new File([finalBlob], `${label}.png`, { type: "image/png" });
         await addEmotion(file, label, charName);
-        return true;
+        return usedSeed;
     } catch (err) {
         console.error(`[NAI Gen] ${label} 실패:`, err);
         throw err;
@@ -2709,9 +2710,9 @@ function createSettingsPanel() {
         this.disabled = true;
         if (resultEl) resultEl.textContent = "⏳ 생성 중...";
         try {
-            await generateSpriteForLabel(charName, label);
+            const usedSeed = await generateSpriteForLabel(charName, label);
             renderEmotionList();
-            if (resultEl) resultEl.textContent = `✅ "${label}" 생성 완료`;
+            if (resultEl) resultEl.textContent = `✅ "${label}" 생성 완료  |  seed: ${usedSeed}`;
             toastr.success(`"${label}" 생성 완료`);
         } catch (err) {
             if (resultEl) resultEl.textContent = `❌ ${err.message}`;
@@ -2732,14 +2733,29 @@ function createSettingsPanel() {
             const negPrompt = "worst quality, bad anatomy, lowres";
             const startTime = performance.now();
 
-            const imageBlob = await callNovelAI(testPrompt, negPrompt, settings.naiConfig);
+            const { blob: imageBlob, seed: usedSeed } = await callNovelAI(testPrompt, negPrompt, settings.naiConfig);
             const elapsed = Math.round((performance.now() - startTime) / 1000);
 
             const url = URL.createObjectURL(imageBlob);
             resultEl.html(`
-                ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)<br>
+                ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)
+                &nbsp;|&nbsp; seed: <code>${usedSeed}</code>
+                <button class="menu_button ds-pin-seed" data-seed="${usedSeed}" style="margin-left:6px; padding:1px 6px; font-size:0.85em;">이 시드 고정</button><br>
                 <img src="${url}" style="max-width:200px; border-radius:6px; margin-top:8px;">
             `);
+            resultEl.find(".ds-pin-seed").on("click", function () {
+                const s = parseInt(this.dataset.seed);
+                settings.naiConfig.seedLocked = true;
+                settings.naiConfig.lockedSeed = s;
+                saveSettingsDebounced();
+                const cb = document.getElementById("ds-nai-seed-lock");
+                const row = document.getElementById("ds-nai-seed-row");
+                const inp = document.getElementById("ds-nai-locked-seed");
+                if (cb) cb.checked = true;
+                if (row) row.style.display = "flex";
+                if (inp) inp.value = s;
+                toastr.success(`시드 ${s} 고정됨`);
+            });
         } catch (err) {
             resultEl.html(`❌ 실패: ${err.message}`);
         } finally {
