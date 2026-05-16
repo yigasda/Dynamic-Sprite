@@ -293,17 +293,18 @@
    아코디언 - 캐릭터별 폴더
 ==================================================================== */
 .ds-emotion-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: block;
     max-height: 600px;
     overflow-y: scroll;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
     overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
     padding-right: 2px;
+}
+
+.ds-emotion-list > .ds-char-accordion {
+    margin-bottom: 6px;
 }
 
 .ds-emotion-list::-webkit-scrollbar {
