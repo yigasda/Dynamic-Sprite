@@ -469,15 +469,31 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
 // ====================================================================
 // NovelAI 이미지 생성 호출
 // ====================================================================
-async function loadJSZip() {
-    if (window.JSZip) return window.JSZip;
-    return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-        script.onload = () => resolve(window.JSZip);
-        script.onerror = () => reject(new Error("JSZip 로드 실패"));
-        document.head.appendChild(script);
-    });
+// NAI ZIP 응답에서 첫 번째 이미지 추출 (JSZip 불필요 — 브라우저 네이티브 API 사용)
+async function extractImageFromNaiZip(arrayBuffer) {
+    const view = new DataView(arrayBuffer);
+    // Local file header: signature 0x04034b50
+    if (view.getUint32(0, true) !== 0x04034b50) throw new Error("NAI ZIP 파싱 실패: 유효하지 않은 ZIP");
+    const compressionMethod = view.getUint16(8, true);
+    const compressedSize   = view.getUint32(18, true);
+    const fnLen            = view.getUint16(26, true);
+    const extraLen         = view.getUint16(28, true);
+    const dataStart        = 30 + fnLen + extraLen;
+    const compressed       = new Uint8Array(arrayBuffer, dataStart, compressedSize);
+
+    if (compressionMethod === 0) {
+        // Stored — no compression
+        return new Blob([compressed], { type: "image/png" });
+    }
+    if (compressionMethod === 8) {
+        // Deflate — DecompressionStream (Chrome 80+, Firefox 102+, Safari 16.4+)
+        const ds = new DecompressionStream("deflate-raw");
+        const writer = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        return new Response(ds.readable).blob();
+    }
+    throw new Error(`NAI ZIP: 지원하지 않는 압축 방식 (method=${compressionMethod})`);
 }
 
 async function callNovelAI(prompt, negativePrompt, config) {
@@ -529,13 +545,8 @@ async function callNovelAI(prompt, negativePrompt, config) {
         throw new Error(`NAI ${res.status}: ${errText.slice(0, 300)}`);
     }
 
-    const zipBlob = await res.blob();
-    const JSZip = await loadJSZip();
-    const zip = await JSZip.loadAsync(zipBlob);
-    const fileName = Object.keys(zip.files)[0];
-    if (!fileName) throw new Error("응답 ZIP이 비어있음");
-    const imageBlob = await zip.files[fileName].async("blob");
-    return new Blob([imageBlob], { type: "image/png" });
+    const arrayBuffer = await res.arrayBuffer();
+    return await extractImageFromNaiZip(arrayBuffer);
 }
 
 // ====================================================================
