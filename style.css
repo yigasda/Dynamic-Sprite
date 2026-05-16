@@ -554,14 +554,14 @@ body[data-ds-theme] #ds-emotion-picker-popup {
 /* ========== MONO 테마 ========== */
 body[data-ds-theme="mono"] #dynamic-sprites-settings,
 body[data-ds-theme="mono"] #ds-emotion-picker-popup {
-    --ds-bg: #111111;
-    --ds-bg-elevated: #1a1a1a;
-    --ds-bg-card: #161616;
-    --ds-text: #f0f0f0;
-    --ds-text-muted: rgba(240, 240, 240, 0.55);
-    --ds-accent: #ffffff;
-    --ds-accent-soft: rgba(255, 255, 255, 0.1);
-    --ds-border: rgba(255, 255, 255, 0.1);
+    --ds-bg: #ffffff;
+    --ds-bg-elevated: #f0f0f0;
+    --ds-bg-card: #f8f8f8;
+    --ds-text: #111111;
+    --ds-text-muted: rgba(17, 17, 17, 0.5);
+    --ds-accent: #111111;
+    --ds-accent-soft: rgba(17, 17, 17, 0.08);
+    --ds-border: rgba(17, 17, 17, 0.12);
     --ds-radius: 4px;
     --ds-radius-lg: 8px;
     --ds-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -608,14 +608,14 @@ body[data-ds-theme="peach"] #ds-emotion-picker-popup {
 /* ========== LILAC 테마 ========== */
 body[data-ds-theme="lilac"] #dynamic-sprites-settings,
 body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
-    --ds-bg: #2a2438;
-    --ds-bg-elevated: #352d47;
-    --ds-bg-card: #2f2840;
-    --ds-text: #efe9f7;
-    --ds-text-muted: rgba(239, 233, 247, 0.6);
-    --ds-accent: #c8a8e9;
-    --ds-accent-soft: rgba(200, 168, 233, 0.2);
-    --ds-border: rgba(239, 233, 247, 0.1);
+    --ds-bg: #f3eeff;
+    --ds-bg-elevated: #e6d9f7;
+    --ds-bg-card: #ede2fb;
+    --ds-text: #3b2660;
+    --ds-text-muted: rgba(59, 38, 96, 0.6);
+    --ds-accent: #8b5cf6;
+    --ds-accent-soft: rgba(139, 92, 246, 0.15);
+    --ds-border: rgba(59, 38, 96, 0.12);
     --ds-radius: 12px;
     --ds-radius-lg: 18px;
     --ds-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
