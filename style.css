@@ -297,8 +297,25 @@
     flex-direction: column;
     gap: 6px;
     max-height: 600px;
-    overflow-y: auto;
-    padding-right: 4px;
+    overflow-y: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
+    padding-right: 2px;
+}
+
+.ds-emotion-list::-webkit-scrollbar {
+    width: 6px;
+    display: block;
+}
+.ds-emotion-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ds-emotion-list::-webkit-scrollbar-thumb {
+    background: rgba(150, 150, 150, 0.45);
+    border-radius: 3px;
+}
+.ds-emotion-list::-webkit-scrollbar-thumb:active {
+    background: rgba(150, 150, 150, 0.75);
 }
 
 .ds-empty {
