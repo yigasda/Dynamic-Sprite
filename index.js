@@ -63,6 +63,17 @@ const defaultSettings = {
     compressMaxDim: 800,    // px - 가장 긴 변 기준
     compressQuality: 85,    // 1-100 (WebP quality)
 
+    // === NovelAI 이미지 생성 설정 ===
+    naiConfig: {
+        apiKey: "",
+        model: "nai-diffusion-4-5-full",
+        width: 832,
+        height: 1216,
+        steps: 28,
+        scale: 5,
+        sampler: "k_euler_ancestral"
+    },
+
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
     characters: {},
     expandedChars: {}, // { charName: true/false }
@@ -453,6 +464,78 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
     const text = data.choices?.[0]?.message?.content;
     if (!text) throw new Error("응답 비어있음: " + JSON.stringify(data).slice(0, 200));
     return text;
+}
+
+// ====================================================================
+// NovelAI 이미지 생성 호출
+// ====================================================================
+async function loadJSZip() {
+    if (window.JSZip) return window.JSZip;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+        script.onload = () => resolve(window.JSZip);
+        script.onerror = () => reject(new Error("JSZip 로드 실패"));
+        document.head.appendChild(script);
+    });
+}
+
+async function callNovelAI(prompt, negativePrompt, config) {
+    if (!config.apiKey) throw new Error("NAI API 키가 비어있음");
+
+    const url = "https://image.novelai.net/ai/generate-image";
+    const seed = Math.floor(Math.random() * 4294967295);
+
+    const body = {
+        input: prompt,
+        model: config.model || "nai-diffusion-4-5-full",
+        action: "generate",
+        parameters: {
+            params_version: 3,
+            width: config.width || 832,
+            height: config.height || 1216,
+            scale: config.scale || 5,
+            sampler: config.sampler || "k_euler_ancestral",
+            steps: config.steps || 28,
+            seed: seed,
+            n_samples: 1,
+            ucPreset: 0,
+            qualityToggle: true,
+            negative_prompt: negativePrompt || "",
+            characterPrompts: [],
+            v4_prompt: {
+                caption: { base_caption: prompt, char_captions: [] },
+                use_coords: false,
+                use_order: true
+            },
+            v4_negative_prompt: {
+                caption: { base_caption: negativePrompt || "", char_captions: [] }
+            }
+        }
+    };
+
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+            "Accept": "application/x-zip-compressed"
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`NAI ${res.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const zipBlob = await res.blob();
+    const JSZip = await loadJSZip();
+    const zip = await JSZip.loadAsync(zipBlob);
+    const fileName = Object.keys(zip.files)[0];
+    if (!fileName) throw new Error("응답 ZIP이 비어있음");
+    const imageBlob = await zip.files[fileName].async("blob");
+    return new Blob([imageBlob], { type: "image/png" });
 }
 
 // ====================================================================
@@ -1410,6 +1493,43 @@ function createSettingsPanel() {
 
                 <hr>
 
+                <div class="ds-section ds-collapsible" data-collapse-key="naiGen">
+                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> AI 표정 생성 (NovelAI)</h4>
+                    <div class="ds-collapse-body">
+                        <p class="ds-hint">NovelAI API로 표정 이미지를 자동 생성합니다. API 키는 NAI 계정 설정에서 발급받으세요.</p>
+
+                        <label>NovelAI API 키</label>
+                        <div class="ds-key-input-wrap">
+                            <input type="password" id="ds-nai-key" class="text_pole"
+                                value="${settings.naiConfig?.apiKey || ""}" autocomplete="off"
+                                placeholder="pst-...">
+                            <button type="button" id="ds-nai-key-toggle" class="menu_button" title="키 표시/숨김">👁</button>
+                        </div>
+
+                        <label>모델</label>
+                        <select id="ds-nai-model" class="text_pole">
+                            <option value="nai-diffusion-4-5-full" ${settings.naiConfig?.model === "nai-diffusion-4-5-full" ? "selected" : ""}>NAI Diffusion V4.5 Full (최신)</option>
+                            <option value="nai-diffusion-4-5-curated" ${settings.naiConfig?.model === "nai-diffusion-4-5-curated" ? "selected" : ""}>NAI Diffusion V4.5 Curated</option>
+                            <option value="nai-diffusion-4-full" ${settings.naiConfig?.model === "nai-diffusion-4-full" ? "selected" : ""}>NAI Diffusion V4 Full</option>
+                            <option value="nai-diffusion-4-curated-preview" ${settings.naiConfig?.model === "nai-diffusion-4-curated-preview" ? "selected" : ""}>NAI Diffusion V4 Curated</option>
+                            <option value="nai-diffusion-3" ${settings.naiConfig?.model === "nai-diffusion-3" ? "selected" : ""}>NAI Diffusion V3</option>
+                        </select>
+
+                        <label>해상도</label>
+                        <select id="ds-nai-size" class="text_pole">
+                            <option value="832x1216">832×1216 (세로 - 캐릭터 추천)</option>
+                            <option value="1024x1024">1024×1024 (정사각)</option>
+                            <option value="1216x832">1216×832 (가로)</option>
+                            <option value="512x768">512×768 (작게)</option>
+                        </select>
+
+                        <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
+                        <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
+                    </div>
+                </div>
+
+                <hr>
+
                 <div class="ds-section">
                     <h4>⚡ 감정 분석용 API</h4>
                     <p class="ds-hint">본문 생성과 별도로 빠른 모델 사용 가능.</p>
@@ -2125,6 +2245,70 @@ function createSettingsPanel() {
                 lastNotifiedChar = charName;
             }
         }, 300);
+    });
+
+    // === NAI 설정 ===
+    $("#ds-nai-key").on("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.apiKey = this.value;
+        saveSettingsDebounced();
+    });
+
+    $("#ds-nai-key-toggle").on("click", function () {
+        const input = document.getElementById("ds-nai-key");
+        if (input.type === "password") {
+            input.type = "text";
+            this.textContent = "🙈";
+        } else {
+            input.type = "password";
+            this.textContent = "👁";
+        }
+    });
+
+    $("#ds-nai-model").on("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.model = this.value;
+        saveSettingsDebounced();
+    });
+
+    $("#ds-nai-size").on("change", function () {
+        const [w, h] = this.value.split("x").map(Number);
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.width = w;
+        settings.naiConfig.height = h;
+        saveSettingsDebounced();
+    });
+
+    if (settings.naiConfig?.width && settings.naiConfig?.height) {
+        const sizeStr = `${settings.naiConfig.width}x${settings.naiConfig.height}`;
+        const sizeSelect = document.getElementById("ds-nai-size");
+        if (sizeSelect) sizeSelect.value = sizeStr;
+    }
+
+    $("#ds-nai-test").on("click", async function () {
+        const resultEl = $("#ds-nai-test-result");
+        const btn = $(this);
+        btn.prop("disabled", true);
+        resultEl.html("🔄 생성 중... (10~30초 소요)");
+
+        try {
+            const testPrompt = "1girl, smile, simple background, masterpiece, best quality";
+            const negPrompt = "worst quality, bad anatomy, lowres";
+            const startTime = performance.now();
+
+            const imageBlob = await callNovelAI(testPrompt, negPrompt, settings.naiConfig);
+            const elapsed = Math.round((performance.now() - startTime) / 1000);
+
+            const url = URL.createObjectURL(imageBlob);
+            resultEl.html(`
+                ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)<br>
+                <img src="${url}" style="max-width:200px; border-radius:6px; margin-top:8px;">
+            `);
+        } catch (err) {
+            resultEl.html(`❌ 실패: ${err.message}`);
+        } finally {
+            btn.prop("disabled", false);
+        }
     });
 
     updateApiFieldsVisibility();
