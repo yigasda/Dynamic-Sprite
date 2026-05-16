@@ -1813,7 +1813,7 @@ function createSettingsPanel() {
                         <hr>
 
                         <label>현재 캐릭터 베이스 프롬프트</label>
-                        <p class="ds-hint">캐릭터 고정 외모/의상. 예: <code>1girl, white hair, blue eyes</code></p>
+                        <p class="ds-hint">캐릭터 고정 외모/의상</p>
                         <textarea id="ds-nai-base-prompt" class="text_pole" rows="3"
                             placeholder="1girl, ..."></textarea>
 
@@ -1824,7 +1824,7 @@ function createSettingsPanel() {
                         <hr>
 
                         <label>단일 생성</label>
-                        <p class="ds-hint">첫 번째 칸은 표정 가중치 — 미등록 라벨에 <code>가중치::label::</code> 형태로 전송</p>
+                        <p class="ds-hint">첫 번째 칸은 표정 가중치, 두 번째 칸은 표정 — <code>가중치::label::</code> 형태로 전송</p>
                         <div style="display:flex; gap:6px; align-items:center;">
                             <input type="number" id="ds-nai-label-intensity" class="text_pole"
                                 value="${settings.naiConfig?.labelIntensity ?? 2}"
