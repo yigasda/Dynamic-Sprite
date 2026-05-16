@@ -1065,7 +1065,6 @@ function renderEmotionList() {
                         style="font-size:0.82em; margin-top:2px;">
                 </div>
                 <div class="ds-emotion-actions">
-                    <button class="menu_button ds-preview-btn" data-char="${charName}" data-idx="${idx}" title="미리보기">👁</button>
                     <button class="menu_button ds-delete-btn" data-char="${charName}" data-idx="${idx}" title="삭제">🗑</button>
                 </div>
             `;
@@ -1128,19 +1127,6 @@ function renderEmotionList() {
                 .filter(s => s.length > 0);
             settings.characters[cn].emotions[idx].groups = groups;
             saveSettingsDebounced();
-        });
-    });
-
-    // 미리보기
-    listEl.querySelectorAll(".ds-preview-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            const cn = e.currentTarget.dataset.char;
-            const idx = parseInt(e.currentTarget.dataset.idx);
-            if (cn === currentChar) {
-                updateSprite(settings.characters[cn].emotions[idx].label);
-            } else {
-                toastr.info("현재 활성 캐릭터의 감정만 미리보기 가능");
-            }
         });
     });
 

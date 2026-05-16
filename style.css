@@ -193,8 +193,8 @@
 /* ====================================================================
    설정 패널 공통
 ==================================================================== */
-.dynamic-sprites-settings .inline-drawer-content { padding: 10px; }
-.dynamic-sprites-settings .ds-section { margin-bottom: 12px; }
+.dynamic-sprites-settings .inline-drawer-content { padding: 10px; overflow: visible; }
+.dynamic-sprites-settings .ds-section { margin-bottom: 12px; overflow: visible; }
 
 .dynamic-sprites-settings h4 {
     margin: 4px 0 8px;
@@ -298,13 +298,16 @@
     gap: 6px;
     max-height: 600px;
     overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
     padding-right: 2px;
 }
 
 .ds-emotion-list::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
     display: block;
 }
 .ds-emotion-list::-webkit-scrollbar-track {
