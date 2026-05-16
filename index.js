@@ -2713,7 +2713,7 @@ function createSettingsPanel() {
             const usedSeed = await generateSpriteForLabel(charName, label);
             renderEmotionList();
             if (resultEl) resultEl.textContent = `✅ "${label}" 생성 완료  |  seed: ${usedSeed}`;
-            toastr.success(`"${label}" 생성 완료`);
+            toastr.success(`seed: ${usedSeed}`, `"${label}" 생성 완료`, { timeOut: 8000 });
         } catch (err) {
             if (resultEl) resultEl.textContent = `❌ ${err.message}`;
             toastr.error(`생성 실패: ${err.message}`);
@@ -2737,11 +2737,12 @@ function createSettingsPanel() {
             const elapsed = Math.round((performance.now() - startTime) / 1000);
 
             const url = URL.createObjectURL(imageBlob);
+            toastr.success(`seed: ${usedSeed}`, "NAI 생성 성공", { timeOut: 8000 });
             resultEl.html(`
                 ✅ 생성 성공 (${elapsed}초, ${Math.round(imageBlob.size / 1024)}KB)<br>
-                <span style="font-size:0.9em;">seed: <b>${usedSeed}</b>
-                <button class="menu_button ds-pin-seed" data-seed="${usedSeed}" style="margin-left:6px; padding:1px 8px; font-size:0.82em; height:auto;">이 시드 고정</button></span><br>
-                <img src="${url}" style="max-width:200px; border-radius:6px; margin-top:8px;">
+                <span style="font-size:0.9em; display:block; margin:4px 0;">seed: <b style="user-select:all;">${usedSeed}</b>
+                &nbsp;<button class="menu_button ds-pin-seed" data-seed="${usedSeed}" style="padding:1px 8px; font-size:0.82em; height:auto;">이 시드 고정</button></span>
+                <img src="${url}" style="max-width:200px; border-radius:6px; margin-top:8px; display:block;">
             `);
             resultEl.find(".ds-pin-seed").on("click", function () {
                 const s = parseInt(this.dataset.seed);
