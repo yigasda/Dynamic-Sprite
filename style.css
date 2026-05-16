@@ -901,7 +901,53 @@ body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"],
 body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"],
 body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"] {
     accent-color: var(--ds-accent) !important;
-    background: transparent !important;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--ds-border) !important;
+    outline: none !important;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-runnable-track,
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-runnable-track,
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-runnable-track,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-runnable-track {
+    background: var(--ds-border) !important;
+    height: 4px;
+    border-radius: 2px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-thumb,
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-thumb,
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-thumb,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ds-accent) !important;
+    border: none !important;
+    margin-top: -6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="range"]::-moz-range-track,
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"]::-moz-range-track,
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"]::-moz-range-track,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"]::-moz-range-track {
+    background: var(--ds-border) !important;
+    height: 4px;
+    border-radius: 2px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="checkbox"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="checkbox"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="checkbox"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="checkbox"] {
+    accent-color: var(--ds-accent) !important;
+    outline: none !important;
 }
 
 /* 버튼 배경과의 대비 강화 — 버튼에 명시적 테두리+약간 밝은 bg */

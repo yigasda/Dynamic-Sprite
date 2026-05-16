@@ -2163,20 +2163,24 @@ jQuery(async () => {
         createSettingsPanel();
         applyTheme();
 
-        // 모바일 감정 리스트 독립 스크롤
+        // 모바일 감정 리스트 독립 스크롤 (scrollTop 직접 제어)
         const _listEl = document.getElementById("ds-emotion-list");
         if (_listEl) {
             let _touchStartY = 0;
+            let _scrollStartTop = 0;
             _listEl.addEventListener("touchstart", e => {
                 _touchStartY = e.touches[0].clientY;
+                _scrollStartTop = _listEl.scrollTop;
             }, { passive: true });
             _listEl.addEventListener("touchmove", e => {
-                const dy = e.touches[0].clientY - _touchStartY;
-                const atTop = _listEl.scrollTop === 0;
-                const atBottom = _listEl.scrollTop + _listEl.clientHeight >= _listEl.scrollHeight - 1;
-                if ((atTop && dy > 0) || (atBottom && dy < 0)) return;
+                const dy = _touchStartY - e.touches[0].clientY;
+                const newTop = _scrollStartTop + dy;
+                const atTop = newTop <= 0 && dy < 0;
+                const atBottom = newTop + _listEl.clientHeight >= _listEl.scrollHeight && dy > 0;
+                if (atTop || atBottom) return;
                 e.stopPropagation();
                 e.preventDefault();
+                _listEl.scrollTop = newTop;
             }, { passive: false });
         }
 
