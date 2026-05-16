@@ -78,7 +78,8 @@ const defaultSettings = {
         seedLocked: false,
         lockedSeed: -1,
         autoRemoveBg: false,
-        removeBgThreshold: 240
+        removeBgThreshold: 240,
+        labelIntensity: 2
     },
 
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
@@ -658,7 +659,8 @@ function buildNaiPrompt(charName, label) {
     const naiGen = charData.naiGen || {};
     const style    = (cfg.naiConfig?.stylePrompt  || "").trim();
     const base     = (naiGen.basePrompt || "").trim();
-    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `2::${label}:::`).trim();
+    const intensity = cfg.naiConfig?.labelIntensity ?? 2;
+    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `${intensity}::${label}:::`).trim();
     const styleNeg = (cfg.naiConfig?.styleNegPrompt || "").trim();
     const charNeg  = (naiGen.negativePrompt || "").trim();
     const defaultNeg = "lowres, bad anatomy, bad hands, text, error, extra digit, worst quality, low quality";
@@ -1794,6 +1796,12 @@ function createSettingsPanel() {
                                 value="${settings.naiConfig?.removeBgThreshold ?? 240}" class="ds-slider">
                         </div>
 
+                        <label style="margin-top:8px;">미등록 라벨 표정 강도</label>
+                        <p class="ds-hint">DEFAULT_LABEL_PROMPTS에 없는 라벨에 적용 (예: 2 → <code>2::label:::</code>)</p>
+                        <input type="number" id="ds-nai-label-intensity" class="text_pole"
+                            value="${settings.naiConfig?.labelIntensity ?? 2}" min="0.1" max="10" step="0.5"
+                            style="width:100px;">
+
                         <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
                         <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
 
@@ -2664,6 +2672,12 @@ function createSettingsPanel() {
         settings.naiConfig.removeBgThreshold = parseInt(this.value);
         const lbl = document.getElementById("ds-nai-bg-thresh-val");
         if (lbl) lbl.textContent = this.value;
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-label-intensity")?.addEventListener("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.labelIntensity = parseFloat(this.value) || 2;
         saveSettingsDebounced();
     });
 
