@@ -526,3 +526,320 @@
     border-left: 3px solid rgba(200, 150, 90, 0.5) !important;
     color: rgba(120, 85, 50, 0.9);
 }
+
+/* ====================================================================
+   테마 시스템
+   설정 패널(#dynamic-sprites-settings)과 감정 선택 팝업(#ds-emotion-picker-popup)에 적용
+   body[data-ds-theme="..."] 셀렉터로 격리
+==================================================================== */
+
+/* 공통: 테마 변수 정의 위치 */
+body[data-ds-theme] #dynamic-sprites-settings,
+body[data-ds-theme] #ds-emotion-picker-popup {
+    --ds-bg: var(--SmartThemeBlurTintColor, rgba(20, 20, 28, 0.95));
+    --ds-bg-elevated: rgba(255, 255, 255, 0.05);
+    --ds-bg-card: rgba(255, 255, 255, 0.03);
+    --ds-text: var(--SmartThemeBodyColor, #e8e5db);
+    --ds-text-muted: rgba(232, 229, 219, 0.6);
+    --ds-accent: var(--SmartThemeQuoteColor, #d4a574);
+    --ds-accent-soft: rgba(212, 165, 116, 0.18);
+    --ds-border: rgba(232, 229, 219, 0.1);
+    --ds-radius: 8px;
+    --ds-radius-lg: 14px;
+    --ds-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    --ds-font-weight: 400;
+    --ds-font-weight-bold: 600;
+}
+
+/* ========== MONO 테마 ========== */
+body[data-ds-theme="mono"] #dynamic-sprites-settings,
+body[data-ds-theme="mono"] #ds-emotion-picker-popup {
+    --ds-bg: #111111;
+    --ds-bg-elevated: #1a1a1a;
+    --ds-bg-card: #161616;
+    --ds-text: #f0f0f0;
+    --ds-text-muted: rgba(240, 240, 240, 0.55);
+    --ds-accent: #ffffff;
+    --ds-accent-soft: rgba(255, 255, 255, 0.1);
+    --ds-border: rgba(255, 255, 255, 0.1);
+    --ds-radius: 4px;
+    --ds-radius-lg: 8px;
+    --ds-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --ds-font-weight: 400;
+    --ds-font-weight-bold: 700;
+}
+
+/* ========== CREAM 테마 ========== */
+body[data-ds-theme="cream"] #dynamic-sprites-settings,
+body[data-ds-theme="cream"] #ds-emotion-picker-popup {
+    --ds-bg: #f5efe0;
+    --ds-bg-elevated: #ede4d0;
+    --ds-bg-card: #f0e8d6;
+    --ds-text: #3a3328;
+    --ds-text-muted: rgba(58, 51, 40, 0.65);
+    --ds-accent: #b08754;
+    --ds-accent-soft: rgba(176, 135, 84, 0.15);
+    --ds-border: rgba(58, 51, 40, 0.12);
+    --ds-radius: 12px;
+    --ds-radius-lg: 18px;
+    --ds-shadow: 0 4px 12px rgba(58, 51, 40, 0.08);
+    --ds-font-weight: 400;
+    --ds-font-weight-bold: 600;
+}
+
+/* ========== PEACH 테마 ========== */
+body[data-ds-theme="peach"] #dynamic-sprites-settings,
+body[data-ds-theme="peach"] #ds-emotion-picker-popup {
+    --ds-bg: #fff4ec;
+    --ds-bg-elevated: #ffe5d6;
+    --ds-bg-card: #fff0e3;
+    --ds-text: #5c3826;
+    --ds-text-muted: rgba(92, 56, 38, 0.65);
+    --ds-accent: #ff8a65;
+    --ds-accent-soft: rgba(255, 138, 101, 0.18);
+    --ds-border: rgba(92, 56, 38, 0.12);
+    --ds-radius: 14px;
+    --ds-radius-lg: 20px;
+    --ds-shadow: 0 4px 16px rgba(255, 138, 101, 0.12);
+    --ds-font-weight: 400;
+    --ds-font-weight-bold: 600;
+}
+
+/* ========== LILAC 테마 ========== */
+body[data-ds-theme="lilac"] #dynamic-sprites-settings,
+body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
+    --ds-bg: #2a2438;
+    --ds-bg-elevated: #352d47;
+    --ds-bg-card: #2f2840;
+    --ds-text: #efe9f7;
+    --ds-text-muted: rgba(239, 233, 247, 0.6);
+    --ds-accent: #c8a8e9;
+    --ds-accent-soft: rgba(200, 168, 233, 0.2);
+    --ds-border: rgba(239, 233, 247, 0.1);
+    --ds-radius: 12px;
+    --ds-radius-lg: 18px;
+    --ds-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
+    --ds-font-weight: 400;
+    --ds-font-weight-bold: 600;
+}
+
+/* ====================================================================
+   변수 적용 - 설정 패널
+==================================================================== */
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings,
+body[data-ds-theme="cream"] #dynamic-sprites-settings,
+body[data-ds-theme="peach"] #dynamic-sprites-settings,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings {
+    background: var(--ds-bg);
+    color: var(--ds-text);
+    border-radius: var(--ds-radius-lg);
+    padding: 6px;
+    font-weight: var(--ds-font-weight);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .inline-drawer-toggle,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .inline-drawer-toggle,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .inline-drawer-toggle,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .inline-drawer-toggle {
+    color: var(--ds-text);
+    font-weight: var(--ds-font-weight-bold);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-section,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-section,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-section,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-section {
+    background: var(--ds-bg-card);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings hr,
+body[data-ds-theme="cream"] #dynamic-sprites-settings hr,
+body[data-ds-theme="peach"] #dynamic-sprites-settings hr,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings hr {
+    display: none;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings h4,
+body[data-ds-theme="cream"] #dynamic-sprites-settings h4,
+body[data-ds-theme="peach"] #dynamic-sprites-settings h4,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings h4 {
+    color: var(--ds-text);
+    font-weight: var(--ds-font-weight-bold);
+    margin: 0 0 8px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .text_pole,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .text_pole,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .text_pole,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .text_pole {
+    background: var(--ds-bg-elevated);
+    color: var(--ds-text);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    padding: 6px 10px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button {
+    background: var(--ds-bg-elevated);
+    color: var(--ds-text);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    font-weight: var(--ds-font-weight-bold);
+    transition: all 150ms ease;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .menu_button:hover,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .menu_button:hover,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .menu_button:hover,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button:hover {
+    background: var(--ds-accent-soft);
+    border-color: var(--ds-accent);
+    color: var(--ds-accent);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings label,
+body[data-ds-theme="cream"] #dynamic-sprites-settings label,
+body[data-ds-theme="peach"] #dynamic-sprites-settings label,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings label {
+    color: var(--ds-text);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-hint,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-hint,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-hint,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-hint {
+    color: var(--ds-text-muted);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"] {
+    accent-color: var(--ds-accent);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-emotion-item,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-emotion-item,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-emotion-item,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-emotion-item {
+    background: var(--ds-bg-elevated);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    box-shadow: var(--ds-shadow);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-char-accordion,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-char-accordion,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-char-accordion,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-char-accordion {
+    background: var(--ds-bg-elevated);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-char-header,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-char-header,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-char-header,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-char-header {
+    background: var(--ds-bg-card);
+    color: var(--ds-text);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-char-accordion.ds-current .ds-char-header,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-char-accordion.ds-current .ds-char-header,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-char-accordion.ds-current .ds-char-header,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-char-accordion.ds-current .ds-char-header {
+    background: var(--ds-accent-soft);
+    color: var(--ds-accent);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings .ds-usage-badge,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .ds-usage-badge,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .ds-usage-badge,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .ds-usage-badge {
+    background: var(--ds-accent-soft);
+    color: var(--ds-accent);
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings code,
+body[data-ds-theme="cream"] #dynamic-sprites-settings code,
+body[data-ds-theme="peach"] #dynamic-sprites-settings code,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings code {
+    background: var(--ds-bg-elevated);
+    color: var(--ds-accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--ds-border);
+}
+
+/* ====================================================================
+   변수 적용 - 감정 선택 팝업
+==================================================================== */
+body[data-ds-theme="mono"] #ds-emotion-picker-popup,
+body[data-ds-theme="cream"] #ds-emotion-picker-popup,
+body[data-ds-theme="peach"] #ds-emotion-picker-popup,
+body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
+    background: var(--ds-bg);
+    color: var(--ds-text);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-lg);
+    box-shadow: var(--ds-shadow);
+}
+
+body[data-ds-theme="mono"] .ds-picker-popup-header,
+body[data-ds-theme="cream"] .ds-picker-popup-header,
+body[data-ds-theme="peach"] .ds-picker-popup-header,
+body[data-ds-theme="lilac"] .ds-picker-popup-header {
+    color: var(--ds-text);
+    border-bottom-color: var(--ds-border);
+    font-weight: var(--ds-font-weight-bold);
+}
+
+body[data-ds-theme="mono"] .ds-picker-popup-close,
+body[data-ds-theme="cream"] .ds-picker-popup-close,
+body[data-ds-theme="peach"] .ds-picker-popup-close,
+body[data-ds-theme="lilac"] .ds-picker-popup-close {
+    color: var(--ds-text);
+}
+
+body[data-ds-theme="mono"] .ds-picker-popup-item,
+body[data-ds-theme="cream"] .ds-picker-popup-item,
+body[data-ds-theme="peach"] .ds-picker-popup-item,
+body[data-ds-theme="lilac"] .ds-picker-popup-item {
+    background: var(--ds-bg-elevated);
+    color: var(--ds-text);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    font-weight: var(--ds-font-weight);
+    transition: all 150ms ease;
+}
+
+body[data-ds-theme="mono"] .ds-picker-popup-item:hover,
+body[data-ds-theme="cream"] .ds-picker-popup-item:hover,
+body[data-ds-theme="peach"] .ds-picker-popup-item:hover,
+body[data-ds-theme="lilac"] .ds-picker-popup-item:hover {
+    background: var(--ds-accent-soft);
+    border-color: var(--ds-accent);
+    color: var(--ds-accent);
+    transform: translateY(-1px);
+}
+
+body[data-ds-theme="mono"] .ds-picker-popup-item.ds-picker-popup-current,
+body[data-ds-theme="cream"] .ds-picker-popup-item.ds-picker-popup-current,
+body[data-ds-theme="peach"] .ds-picker-popup-item.ds-picker-popup-current,
+body[data-ds-theme="lilac"] .ds-picker-popup-item.ds-picker-popup-current {
+    background: var(--ds-accent-soft);
+    border-color: var(--ds-accent);
+    color: var(--ds-accent);
+    font-weight: var(--ds-font-weight-bold);
+}
