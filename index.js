@@ -1472,10 +1472,12 @@ function createSettingsPanel() {
                 <div class="ds-section">
                     <h4>현재 활성 캐릭터: <span id="ds-current-char" style="color:var(--SmartThemeQuoteColor);"></span></h4>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-                        <button id="ds-delete-current-char" class="menu_button" style="flex:1; min-width:120px;">🗑️ 현재 캐릭터 감정 전체 삭제</button>
-                        <button id="ds-delete-all" class="menu_button" style="flex:1; min-width:120px; color:#ff8080;">⚠️ 모든 캐릭터 전체 삭제</button>
+                        <button id="ds-delete-current-char" class="menu_button" style="flex:1; min-width:120px;">현재 캐릭터 감정 전체 삭제</button>
+                        <button id="ds-delete-all" class="menu_button" style="flex:1; min-width:120px; color:#ff8080;">모든 캐릭터 전체 삭제</button>
                     </div>
-                    <div id="ds-emotion-list" class="ds-emotion-list"></div>
+                    <div class="ds-emotion-list-wrap">
+                        <div id="ds-emotion-list" class="ds-emotion-list"></div>
+                    </div>
                 </div>
 
                 <hr>
@@ -1488,8 +1490,8 @@ function createSettingsPanel() {
                     <input type="file" id="ds-file-input" accept="image/*" multiple style="display:none;">
                     <input type="file" id="ds-folder-input" webkitdirectory directory multiple style="display:none;">
                     <div class="ds-upload-buttons">
-                        <button id="ds-upload-files-btn" class="menu_button">🖼️ 파일들 선택</button>
-                        <button id="ds-upload-folder-btn" class="menu_button">📁 폴더 통째로</button>
+                        <button id="ds-upload-files-btn" class="menu_button">파일들 선택</button>
+                        <button id="ds-upload-folder-btn" class="menu_button">폴더 통째로</button>
                     </div>
                     <div id="ds-upload-status"></div>
                 </div>

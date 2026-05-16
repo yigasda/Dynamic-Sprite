@@ -292,11 +292,33 @@
 /* ====================================================================
    아코디언 - 캐릭터별 폴더
 ==================================================================== */
+/* 드래그 리사이즈 래퍼 */
+.ds-emotion-list-wrap {
+    resize: vertical;
+    overflow: hidden;
+    min-height: 120px;
+    max-height: 800px;
+    border-radius: 6px;
+    position: relative;
+    /* 브라우저 기본 리사이즈 핸들 위에 시각 힌트 */
+}
+.ds-emotion-list-wrap::after {
+    content: "↕ 드래그로 높이 조절";
+    display: block;
+    text-align: center;
+    font-size: 0.72em;
+    opacity: 0.4;
+    padding: 2px 0 1px;
+    pointer-events: none;
+    user-select: none;
+}
+
 .ds-emotion-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: 600px;
+    height: calc(100% - 18px);
+    max-height: none;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -608,14 +630,14 @@ body[data-ds-theme="peach"] #ds-emotion-picker-popup {
 /* ========== LILAC 테마 ========== */
 body[data-ds-theme="lilac"] #dynamic-sprites-settings,
 body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
-    --ds-bg: #f8e8ff;
-    --ds-bg-elevated: #ecd4f5;
-    --ds-bg-card: #f2dcfb;
-    --ds-text: #4a1a62;
-    --ds-text-muted: rgba(74, 26, 98, 0.6);
-    --ds-accent: #b04ec8;
-    --ds-accent-soft: rgba(176, 78, 200, 0.15);
-    --ds-border: rgba(74, 26, 98, 0.13);
+    --ds-bg: #fefaff;
+    --ds-bg-elevated: #f5eafe;
+    --ds-bg-card: #fbf5ff;
+    --ds-text: #5c2d7a;
+    --ds-text-muted: rgba(92, 45, 122, 0.55);
+    --ds-accent: #b06dcc;
+    --ds-accent-soft: rgba(176, 109, 204, 0.13);
+    --ds-border: rgba(92, 45, 122, 0.1);
     --ds-radius: 12px;
     --ds-radius-lg: 18px;
     --ds-shadow: 0 4px 20px rgba(60, 30, 90, 0.3);
@@ -842,4 +864,53 @@ body[data-ds-theme="lilac"] .ds-picker-popup-item.ds-picker-popup-current {
     border-color: var(--ds-accent) !important;
     color: var(--ds-accent) !important;
     font-weight: var(--ds-font-weight-bold) !important;
+}
+
+/* ====================================================================
+   ST 기본 스타일 강제 덮어쓰기 — input / select / textarea / slider
+==================================================================== */
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="text"],
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="number"],
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="password"],
+body[data-ds-theme="mono"] #dynamic-sprites-settings textarea,
+body[data-ds-theme="mono"] #dynamic-sprites-settings select,
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="text"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="number"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="password"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings textarea,
+body[data-ds-theme="cream"] #dynamic-sprites-settings select,
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="text"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="number"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="password"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings textarea,
+body[data-ds-theme="peach"] #dynamic-sprites-settings select,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="text"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="number"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="password"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings textarea,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings select {
+    background: var(--ds-bg-elevated) !important;
+    color: var(--ds-text) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+body[data-ds-theme="mono"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="cream"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="peach"] #dynamic-sprites-settings input[type="range"],
+body[data-ds-theme="lilac"] #dynamic-sprites-settings input[type="range"] {
+    accent-color: var(--ds-accent) !important;
+    background: transparent !important;
+}
+
+/* 버튼 배경과의 대비 강화 — 버튼에 명시적 테두리+약간 밝은 bg */
+body[data-ds-theme="mono"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .menu_button,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .menu_button {
+    background: var(--ds-bg) !important;
+    border: 1.5px solid var(--ds-border) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
 }
