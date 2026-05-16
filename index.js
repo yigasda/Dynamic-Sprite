@@ -469,24 +469,38 @@ async function callOpenAICompat(prompt, apiKey, endpoint, model) {
 // ====================================================================
 // NovelAI 이미지 생성 호출
 // ====================================================================
-// NAI ZIP 응답에서 첫 번째 이미지 추출 (JSZip 불필요 — 브라우저 네이티브 API 사용)
+// NAI ZIP 응답에서 첫 번째 이미지 추출
+// Central Directory 기준으로 파싱 → data descriptor 방식도 정상 처리
 async function extractImageFromNaiZip(arrayBuffer) {
     const view = new DataView(arrayBuffer);
-    // Local file header: signature 0x04034b50
-    if (view.getUint32(0, true) !== 0x04034b50) throw new Error("NAI ZIP 파싱 실패: 유효하지 않은 ZIP");
-    const compressionMethod = view.getUint16(8, true);
-    const compressedSize   = view.getUint32(18, true);
-    const fnLen            = view.getUint16(26, true);
-    const extraLen         = view.getUint16(28, true);
-    const dataStart        = 30 + fnLen + extraLen;
-    const compressed       = new Uint8Array(arrayBuffer, dataStart, compressedSize);
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // 1) End of Central Directory (EOCD) 탐색 (뒤에서부터)
+    let eocdOffset = -1;
+    for (let i = bytes.length - 22; i >= 0; i--) {
+        if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
+    }
+    if (eocdOffset < 0) throw new Error("NAI ZIP: EOCD 없음 (응답이 ZIP이 아닐 수 있음)");
+
+    // 2) Central Directory에서 파일 정보 읽기 (여기가 항상 정확한 크기)
+    const cdOffset = view.getUint32(eocdOffset + 16, true);
+    if (view.getUint32(cdOffset, true) !== 0x02014b50) throw new Error("NAI ZIP: Central Directory 파싱 실패");
+    const compressionMethod = view.getUint16(cdOffset + 10, true);
+    const compressedSize    = view.getUint32(cdOffset + 20, true);
+    const localHeaderOffset = view.getUint32(cdOffset + 42, true);
+
+    // 3) Local File Header에서 실제 데이터 오프셋 계산
+    if (view.getUint32(localHeaderOffset, true) !== 0x04034b50) throw new Error("NAI ZIP: Local Header 파싱 실패");
+    const fnLen    = view.getUint16(localHeaderOffset + 26, true);
+    const extraLen = view.getUint16(localHeaderOffset + 28, true);
+    const dataStart = localHeaderOffset + 30 + fnLen + extraLen;
+
+    const compressed = new Uint8Array(arrayBuffer, dataStart, compressedSize);
 
     if (compressionMethod === 0) {
-        // Stored — no compression
         return new Blob([compressed], { type: "image/png" });
     }
     if (compressionMethod === 8) {
-        // Deflate — DecompressionStream (Chrome 80+, Firefox 102+, Safari 16.4+)
         const ds = new DecompressionStream("deflate-raw");
         const writer = ds.writable.getWriter();
         writer.write(compressed);
