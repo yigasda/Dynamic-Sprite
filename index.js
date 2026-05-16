@@ -660,7 +660,7 @@ function buildNaiPrompt(charName, label) {
     const style    = (cfg.naiConfig?.stylePrompt  || "").trim();
     const base     = (naiGen.basePrompt || "").trim();
     const intensity = cfg.naiConfig?.labelIntensity ?? 2;
-    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `${intensity}::${label}:::`).trim();
+    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `${intensity}::${label}::`).trim();
     const styleNeg = (cfg.naiConfig?.styleNegPrompt || "").trim();
     const charNeg  = (naiGen.negativePrompt || "").trim();
     const defaultNeg = "lowres, bad anatomy, bad hands, text, error, extra digit, worst quality, low quality";
@@ -1797,7 +1797,7 @@ function createSettingsPanel() {
                         </div>
 
                         <label style="margin-top:8px;">미등록 라벨 표정 강도</label>
-                        <p class="ds-hint">DEFAULT_LABEL_PROMPTS에 없는 라벨에 적용 (예: 2 → <code>2::label:::</code>)</p>
+                        <p class="ds-hint">DEFAULT_LABEL_PROMPTS에 없는 라벨에 적용 (예: 2 → <code>2::label::</code>)</p>
                         <input type="number" id="ds-nai-label-intensity" class="text_pole"
                             value="${settings.naiConfig?.labelIntensity ?? 2}" min="0.1" max="10" step="0.5"
                             style="width:100px;">
