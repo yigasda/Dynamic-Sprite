@@ -1476,8 +1476,8 @@ function createSettingsPanel() {
                     </div>
                     <div id="ds-emotion-list" class="ds-emotion-list"></div>
                     <div class="ds-list-nav">
-                        <button class="ds-list-nav-btn" id="ds-list-up" title="위로">&lt;</button>
-                        <button class="ds-list-nav-btn" id="ds-list-down" title="아래로">&gt;</button>
+                        <button class="menu_button ds-list-nav-btn" id="ds-list-up" title="위로">&lt;</button>
+                        <button class="menu_button ds-list-nav-btn" id="ds-list-down" title="아래로">&gt;</button>
                     </div>
                 </div>
 
@@ -2192,26 +2192,6 @@ jQuery(async () => {
         applyTheme();
 
         // 모바일 감정 리스트 독립 스크롤 (scrollTop 직접 제어)
-        const _listEl = document.getElementById("ds-emotion-list");
-        if (_listEl) {
-            let _touchStartY = 0;
-            let _scrollStartTop = 0;
-            _listEl.addEventListener("touchstart", e => {
-                _touchStartY = e.touches[0].clientY;
-                _scrollStartTop = _listEl.scrollTop;
-            }, { passive: true });
-            _listEl.addEventListener("touchmove", e => {
-                const dy = _touchStartY - e.touches[0].clientY;
-                const newTop = _scrollStartTop + dy;
-                const isAtTop = _listEl.scrollTop <= 0;
-                const isAtBottom = _listEl.scrollTop + _listEl.clientHeight >= _listEl.scrollHeight - 1;
-                if ((isAtTop && dy < 0) || (isAtBottom && dy > 0)) return;
-                e.stopPropagation();
-                e.preventDefault();
-                _listEl.scrollTop = newTop;
-            }, { passive: false, capture: true });
-        }
-
         addWandMenuItems();
 
         // origin이 바뀌어서 IndexedDB가 비어있는데 백업은 있는 경우 자동 복원
