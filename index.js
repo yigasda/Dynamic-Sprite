@@ -41,10 +41,6 @@ const defaultSettings = {
     // === 표시 설정 프리셋 (이름 → 설정 스냅샷) ===
     displayPresets: {},
 
-    // === 캐릭터별 자동 프리셋 매핑 ===
-    // { charName: presetName } - 캐릭터 바꾸면 자동으로 프리셋 적용
-    characterPresetMap: {},
-
     // === 캐릭터 변경 시 알림 ===
     notifyCharChange: true,
 
@@ -74,8 +70,7 @@ const defaultSettings = {
         mobileDisplay: true,
         presets: true,
         compress: true,
-        groups: true,
-        charPreset: true
+        groups: true
     }
 };
 
@@ -1265,6 +1260,10 @@ function createSettingsPanel() {
                         <input id="ds-show-sprite" type="checkbox" ${settings.showSprite ? "checked" : ""}>
                         <span>스프라이트 표시</span>
                     </label>
+                    <label class="checkbox_label">
+                        <input id="ds-notify-char-change" type="checkbox" ${settings.notifyCharChange !== false ? "checked" : ""}>
+                        <span>캐릭터 변경 시 알림 표시</span>
+                    </label>
                     <label>전환 효과 시간 (ms)</label>
                     <input id="ds-transition" type="number" class="text_pole"
                         value="${settings.transitionDuration}" min="0" max="2000">
@@ -1373,20 +1372,6 @@ function createSettingsPanel() {
                         <input id="ds-compress-maxdim" type="range" min="200" max="2000" step="50" value="${settings.compressMaxDim || 800}" class="ds-slider">
                         <label>품질 (%) — <span id="ds-compress-quality-val">${settings.compressQuality || 85}</span></label>
                         <input id="ds-compress-quality" type="range" min="30" max="100" step="5" value="${settings.compressQuality || 85}" class="ds-slider">
-                    </div>
-                </div>
-
-                <hr>
-
-                <div class="ds-section ds-collapsible" data-collapse-key="charPreset">
-                    <h4 class="ds-collapse-header"><span class="ds-collapse-arrow">▶</span> 🎭 캐릭터별 자동 프리셋</h4>
-                    <div class="ds-collapse-body">
-                        <p class="ds-hint">캐릭터를 바꾸면 등록된 프리셋이 자동 적용됩니다. 캐릭터마다 다른 위치/크기 쓸 때 편리합니다.</p>
-                        <label class="checkbox_label">
-                            <input id="ds-notify-char-change" type="checkbox" ${settings.notifyCharChange !== false ? "checked" : ""}>
-                            <span>캐릭터 변경 시 알림 표시</span>
-                        </label>
-                        <div id="ds-char-preset-list" style="margin-top:8px;"></div>
                     </div>
                 </div>
 
@@ -1722,7 +1707,6 @@ function createSettingsPanel() {
         saveSettingsDebounced();
         nameInput.value = "";
         renderPresetList();
-        renderCharPresetList();
         toastr.success(`"${name}" 프리셋 저장됨`);
     });
 
@@ -1773,66 +1757,10 @@ function createSettingsPanel() {
     bindDisplaySlider("ds-compress-maxdim", "ds-compress-maxdim-val", "compressMaxDim");
     bindDisplaySlider("ds-compress-quality", "ds-compress-quality-val", "compressQuality");
 
-    // === 캐릭터별 자동 프리셋 매핑 ===
-    function renderCharPresetList() {
-        const listEl = document.getElementById("ds-char-preset-list");
-        if (!listEl) return;
-        settings.characterPresetMap = settings.characterPresetMap || {};
-        settings.displayPresets = settings.displayPresets || {};
-
-        const allChars = Object.keys(settings.characters).filter(n =>
-            settings.characters[n].emotions.length > 0
-        ).sort();
-        const presetNames = Object.keys(settings.displayPresets);
-
-        if (allChars.length === 0) {
-            listEl.innerHTML = `<div class="ds-hint">등록된 캐릭터 없음</div>`;
-            return;
-        }
-        if (presetNames.length === 0) {
-            listEl.innerHTML = `<div class="ds-hint">먼저 표시 설정 프리셋을 만들어주세요</div>`;
-            return;
-        }
-
-        listEl.innerHTML = allChars.map(charName => {
-            const current = settings.characterPresetMap[charName] || "";
-            const options = `<option value="">— 사용 안 함 —</option>` +
-                presetNames.map(name =>
-                    `<option value="${name}" ${name === current ? "selected" : ""}>${name}</option>`
-                ).join("");
-            return `
-                <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
-                    <span style="flex:1; font-size:0.9em;">${charName}</span>
-                    <span style="opacity:0.4;">→</span>
-                    <select class="text_pole ds-char-preset-select" data-char="${charName}" style="flex:1.5; font-size:0.85em;">${options}</select>
-                </div>
-            `;
-        }).join("");
-
-        listEl.querySelectorAll(".ds-char-preset-select").forEach(sel => {
-            sel.addEventListener("change", (e) => {
-                const charName = e.currentTarget.dataset.char;
-                const presetName = e.currentTarget.value;
-                if (presetName) {
-                    settings.characterPresetMap[charName] = presetName;
-                } else {
-                    delete settings.characterPresetMap[charName];
-                }
-                saveSettingsDebounced();
-            });
-        });
-    }
-
     $("#ds-notify-char-change").on("change", function () {
         settings.notifyCharChange = $(this).prop("checked");
         saveSettingsDebounced();
     });
-
-    document.querySelector('[data-collapse-key="charPreset"] .ds-collapse-header')?.addEventListener("click", () => {
-        setTimeout(renderCharPresetList, 50);
-    });
-
-    renderCharPresetList();
 
     // === 통계 / 그룹별 사용 ===
     function renderStats() {
@@ -2128,26 +2056,30 @@ function createSettingsPanel() {
     });
 
     let lastNotifiedChar = null;
-    eventSource.on(event_types.CHAT_CHANGED, () => {
-        setTimeout(() => {
+    eventSource.on(event_types.CHAT_CHANGED, async () => {
+        setTimeout(async () => {
             renderEmotionList();
-            renderCharPresetList();
 
             const charName = getCurrentCharName();
-            if (charName && charName !== lastNotifiedChar) {
-                const mappedPreset = settings.characterPresetMap?.[charName];
-                if (mappedPreset && settings.displayPresets?.[mappedPreset]) {
-                    const preset = settings.displayPresets[mappedPreset];
-                    for (const k of DISPLAY_KEYS) {
-                        if (preset[k] !== undefined) settings[k] = preset[k];
-                    }
-                    applyDisplayStyles();
-                    syncDisplayUI();
-                    saveSettingsDebounced();
-                    if (settings.notifyCharChange) {
-                        toastr.info(`"${charName}" → 프리셋 "${mappedPreset}" 자동 적용`, "", { timeOut: 2000 });
-                    }
-                } else if (settings.notifyCharChange && lastNotifiedChar !== null) {
+            if (!charName) return;
+
+            const charData = settings.characters[charName];
+            const img = document.getElementById("dynamic-sprite-img");
+
+            if (charData && charData.emotions.length > 0) {
+                const targetLabel = charData.current
+                    || charData.emotions.find(e => e.label.toLowerCase() === "neutral")?.label
+                    || charData.emotions[0].label;
+                await updateSprite(targetLabel);
+            } else {
+                if (img) {
+                    img.style.opacity = "0";
+                    setTimeout(() => { img.style.display = "none"; }, settings.transitionDuration || 300);
+                }
+            }
+
+            if (charName !== lastNotifiedChar) {
+                if (settings.notifyCharChange && lastNotifiedChar !== null) {
                     toastr.info(`캐릭터 변경: ${charName}`, "", { timeOut: 1500 });
                 }
                 lastNotifiedChar = charName;
