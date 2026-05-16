@@ -1476,8 +1476,8 @@ function createSettingsPanel() {
                     </div>
                     <div id="ds-emotion-list" class="ds-emotion-list"></div>
                     <div class="ds-list-nav">
-                        <button class="menu_button ds-list-nav-btn" id="ds-list-up" title="위로">&lt;</button>
-                        <button class="menu_button ds-list-nav-btn" id="ds-list-down" title="아래로">&gt;</button>
+                        <button class="ds-list-nav-btn" id="ds-list-up" title="위로">&lt;</button>
+                        <button class="ds-list-nav-btn" id="ds-list-down" title="아래로">&gt;</button>
                     </div>
                 </div>
 
@@ -1528,6 +1528,16 @@ function createSettingsPanel() {
     </div>`;
 
     $("#extensions_settings").append(html);
+
+    // 리스트 네비게이션 버튼 — append 직후 직접 바인딩
+    document.getElementById("ds-list-up").addEventListener("click", () => {
+        const el = document.getElementById("ds-emotion-list");
+        if (el) el.scrollTop = Math.max(0, el.scrollTop - 280);
+    });
+    document.getElementById("ds-list-down").addEventListener("click", () => {
+        const el = document.getElementById("ds-emotion-list");
+        if (el) el.scrollTop = Math.min(el.scrollHeight, el.scrollTop + 280);
+    });
 
     // === 이벤트 바인딩 ===
 
@@ -2010,14 +2020,6 @@ function createSettingsPanel() {
 
     $("#ds-refresh").on("click", renderEmotionList);
 
-    $("#ds-list-up").on("click", () => {
-        const el = document.getElementById("ds-emotion-list");
-        if (el) el.scrollTop = Math.max(0, el.scrollTop - 280);
-    });
-    $("#ds-list-down").on("click", () => {
-        const el = document.getElementById("ds-emotion-list");
-        if (el) el.scrollTop = Math.min(el.scrollHeight, el.scrollTop + 280);
-    });
 
     $("#ds-test-btn").on("click", async function () {
         const text = $("#ds-test-input").val();
