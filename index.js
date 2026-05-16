@@ -1475,9 +1475,7 @@ function createSettingsPanel() {
                         <button id="ds-delete-current-char" class="menu_button" style="flex:1; min-width:120px;">현재 캐릭터 감정 전체 삭제</button>
                         <button id="ds-delete-all" class="menu_button" style="flex:1; min-width:120px; color:#ff8080;">모든 캐릭터 전체 삭제</button>
                     </div>
-                    <div class="ds-emotion-list-wrap">
-                        <div id="ds-emotion-list" class="ds-emotion-list"></div>
-                    </div>
+                    <div id="ds-emotion-list" class="ds-emotion-list"></div>
                 </div>
 
                 <hr>

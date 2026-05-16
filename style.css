@@ -292,33 +292,11 @@
 /* ====================================================================
    아코디언 - 캐릭터별 폴더
 ==================================================================== */
-/* 드래그 리사이즈 래퍼 */
-.ds-emotion-list-wrap {
-    resize: vertical;
-    overflow: hidden;
-    min-height: 120px;
-    max-height: 800px;
-    border-radius: 6px;
-    position: relative;
-    /* 브라우저 기본 리사이즈 핸들 위에 시각 힌트 */
-}
-.ds-emotion-list-wrap::after {
-    content: "↕ 드래그로 높이 조절";
-    display: block;
-    text-align: center;
-    font-size: 0.72em;
-    opacity: 0.4;
-    padding: 2px 0 1px;
-    pointer-events: none;
-    user-select: none;
-}
-
 .ds-emotion-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    height: calc(100% - 18px);
-    max-height: none;
+    max-height: 600px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -649,10 +627,11 @@ body[data-ds-theme="lilac"] #ds-emotion-picker-popup {
    변수 적용 - 설정 패널
 ==================================================================== */
 
-body[data-ds-theme="mono"] #dynamic-sprites-settings,
-body[data-ds-theme="cream"] #dynamic-sprites-settings,
-body[data-ds-theme="peach"] #dynamic-sprites-settings,
-body[data-ds-theme="lilac"] #dynamic-sprites-settings {
+/* 배경은 content 영역에만 — 확장 목록 헤더에 번지지 않도록 */
+body[data-ds-theme="mono"] #dynamic-sprites-settings .inline-drawer-content,
+body[data-ds-theme="cream"] #dynamic-sprites-settings .inline-drawer-content,
+body[data-ds-theme="peach"] #dynamic-sprites-settings .inline-drawer-content,
+body[data-ds-theme="lilac"] #dynamic-sprites-settings .inline-drawer-content {
     background: var(--ds-bg);
     color: var(--ds-text);
     border-radius: var(--ds-radius-lg);
