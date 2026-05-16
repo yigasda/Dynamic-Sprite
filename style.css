@@ -294,7 +294,7 @@
 ==================================================================== */
 .ds-emotion-list {
     display: block;
-    max-height: 600px;
+    max-height: 400px;
     overflow-y: scroll;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
