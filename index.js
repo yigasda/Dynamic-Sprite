@@ -175,6 +175,9 @@ function applyTheme() {
     const settings = extension_settings[extensionName];
     const theme = settings.theme || "system";
     document.body.setAttribute("data-ds-theme", theme);
+    document.querySelectorAll(".ds-theme-btn").forEach(btn => {
+        btn.classList.toggle("ds-theme-active", btn.dataset.theme === theme);
+    });
 }
 
 // ====================================================================
@@ -1266,13 +1269,23 @@ function createSettingsPanel() {
                     <input id="ds-transition" type="number" class="text_pole"
                         value="${settings.transitionDuration}" min="0" max="2000">
                     <label>🎨 테마</label>
-                    <select id="ds-theme" class="text_pole">
-                        <option value="system" ${settings.theme === "system" ? "selected" : ""}>System (기본)</option>
-                        <option value="mono" ${settings.theme === "mono" ? "selected" : ""}>Mono (미니멀 흑백)</option>
-                        <option value="cream" ${settings.theme === "cream" ? "selected" : ""}>Cream (베이지 라이트)</option>
-                        <option value="peach" ${settings.theme === "peach" ? "selected" : ""}>Peach (피치/코랄)</option>
-                        <option value="lilac" ${settings.theme === "lilac" ? "selected" : ""}>Lilac (연보라)</option>
-                    </select>
+                    <div class="ds-theme-picker">
+                        <button class="ds-theme-btn ${settings.theme === "system" ? "ds-theme-active" : ""}" data-theme="system" title="System (기본)">
+                            <span class="ds-theme-swatch" style="background:linear-gradient(135deg,var(--SmartThemeBlurTintColor,#e8dcc8) 50%,var(--SmartThemeQuoteColor,#c8955a) 50%);"></span>
+                        </button>
+                        <button class="ds-theme-btn ${settings.theme === "mono" ? "ds-theme-active" : ""}" data-theme="mono" title="Mono (흑백)">
+                            <span class="ds-theme-swatch" style="background:linear-gradient(135deg,#fff 50%,#111 50%);"></span>
+                        </button>
+                        <button class="ds-theme-btn ${settings.theme === "cream" ? "ds-theme-active" : ""}" data-theme="cream" title="Cream (베이지)">
+                            <span class="ds-theme-swatch" style="background:linear-gradient(135deg,#f5efe0 50%,#b08754 50%);"></span>
+                        </button>
+                        <button class="ds-theme-btn ${settings.theme === "peach" ? "ds-theme-active" : ""}" data-theme="peach" title="Peach (피치)">
+                            <span class="ds-theme-swatch" style="background:linear-gradient(135deg,#fff4ec 50%,#ff8a65 50%);"></span>
+                        </button>
+                        <button class="ds-theme-btn ${settings.theme === "lilac" ? "ds-theme-active" : ""}" data-theme="lilac" title="Lilac (연보라)">
+                            <span class="ds-theme-swatch" style="background:linear-gradient(135deg,#fef8ff 50%,#b06dcc 50%);"></span>
+                        </button>
+                    </div>
                 </div>
 
                 <hr>
@@ -1531,8 +1544,8 @@ function createSettingsPanel() {
         saveSettingsDebounced();
     });
 
-    $("#ds-theme").on("change", function () {
-        settings.theme = this.value;
+    $(document).on("click", "#dynamic-sprites-settings .ds-theme-btn", function () {
+        settings.theme = this.dataset.theme;
         applyTheme();
         saveSettingsDebounced();
     });
@@ -2175,13 +2188,13 @@ jQuery(async () => {
             _listEl.addEventListener("touchmove", e => {
                 const dy = _touchStartY - e.touches[0].clientY;
                 const newTop = _scrollStartTop + dy;
-                const atTop = newTop <= 0 && dy < 0;
-                const atBottom = newTop + _listEl.clientHeight >= _listEl.scrollHeight && dy > 0;
-                if (atTop || atBottom) return;
+                const isAtTop = _listEl.scrollTop <= 0;
+                const isAtBottom = _listEl.scrollTop + _listEl.clientHeight >= _listEl.scrollHeight - 1;
+                if ((isAtTop && dy < 0) || (isAtBottom && dy > 0)) return;
                 e.stopPropagation();
                 e.preventDefault();
                 _listEl.scrollTop = newTop;
-            }, { passive: false });
+            }, { passive: false, capture: true });
         }
 
         addWandMenuItems();
