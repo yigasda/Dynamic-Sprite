@@ -2162,6 +2162,24 @@ jQuery(async () => {
         applyDisplayStyles();
         createSettingsPanel();
         applyTheme();
+
+        // 모바일 감정 리스트 독립 스크롤
+        const _listEl = document.getElementById("ds-emotion-list");
+        if (_listEl) {
+            let _touchStartY = 0;
+            _listEl.addEventListener("touchstart", e => {
+                _touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+            _listEl.addEventListener("touchmove", e => {
+                const dy = e.touches[0].clientY - _touchStartY;
+                const atTop = _listEl.scrollTop === 0;
+                const atBottom = _listEl.scrollTop + _listEl.clientHeight >= _listEl.scrollHeight - 1;
+                if ((atTop && dy > 0) || (atBottom && dy < 0)) return;
+                e.stopPropagation();
+                e.preventDefault();
+            }, { passive: false });
+        }
+
         addWandMenuItems();
 
         // origin이 바뀌어서 IndexedDB가 비어있는데 백업은 있는 경우 자동 복원
