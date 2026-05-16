@@ -658,7 +658,7 @@ function buildNaiPrompt(charName, label) {
     const naiGen = charData.naiGen || {};
     const style    = (cfg.naiConfig?.stylePrompt  || "").trim();
     const base     = (naiGen.basePrompt || "").trim();
-    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || label).trim();
+    const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || `2::${label}:::`).trim();
     const styleNeg = (cfg.naiConfig?.styleNegPrompt || "").trim();
     const charNeg  = (naiGen.negativePrompt || "").trim();
     const defaultNeg = "lowres, bad anatomy, bad hands, text, error, extra digit, worst quality, low quality";
