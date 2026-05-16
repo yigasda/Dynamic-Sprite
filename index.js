@@ -44,6 +44,9 @@ const defaultSettings = {
     // === 캐릭터 변경 시 알림 ===
     notifyCharChange: true,
 
+    // === 테마 ===
+    theme: "system", // system, mono, cream, peach, lilac
+
     // === 사용자 정의 감정 별칭 ===
     // { "synonymWord": "canonicalLabel" } 형식
     // 예: { "ecstatic": "happy" } → AI가 "ecstatic" 뱉으면 "happy" 라벨로 매칭
@@ -163,6 +166,15 @@ function createSpriteContainer() {
     container.id = "dynamic-sprite-container";
     container.innerHTML = `<img id="dynamic-sprite-img" alt="sprite">`;
     document.body.appendChild(container);
+}
+
+// ====================================================================
+// 테마 적용
+// ====================================================================
+function applyTheme() {
+    const settings = extension_settings[extensionName];
+    const theme = settings.theme || "system";
+    document.body.setAttribute("data-ds-theme", theme);
 }
 
 // ====================================================================
@@ -1267,6 +1279,14 @@ function createSettingsPanel() {
                     <label>전환 효과 시간 (ms)</label>
                     <input id="ds-transition" type="number" class="text_pole"
                         value="${settings.transitionDuration}" min="0" max="2000">
+                    <label>🎨 테마</label>
+                    <select id="ds-theme" class="text_pole">
+                        <option value="system" ${settings.theme === "system" ? "selected" : ""}>System (기본)</option>
+                        <option value="mono" ${settings.theme === "mono" ? "selected" : ""}>Mono (미니멀 흑백)</option>
+                        <option value="cream" ${settings.theme === "cream" ? "selected" : ""}>Cream (베이지 라이트)</option>
+                        <option value="peach" ${settings.theme === "peach" ? "selected" : ""}>Peach (피치/코랄)</option>
+                        <option value="lilac" ${settings.theme === "lilac" ? "selected" : ""}>Lilac (연보라)</option>
+                    </select>
                 </div>
 
                 <hr>
@@ -1522,6 +1542,12 @@ function createSettingsPanel() {
 
     $("#ds-transition").on("change", function () {
         settings.transitionDuration = parseInt(this.value) || 300;
+        saveSettingsDebounced();
+    });
+
+    $("#ds-theme").on("change", function () {
+        settings.theme = this.value;
+        applyTheme();
         saveSettingsDebounced();
     });
 
@@ -2149,6 +2175,7 @@ jQuery(async () => {
         createSpriteContainer();
         applyDisplayStyles();
         createSettingsPanel();
+        applyTheme();
         addWandMenuItems();
 
         // origin이 바뀌어서 IndexedDB가 비어있는데 백업은 있는 경우 자동 복원
