@@ -71,9 +71,14 @@ const defaultSettings = {
         height: 1216,
         steps: 28,
         scale: 5,
+        cfgRescale: 0,
         sampler: "k_euler_ancestral",
         stylePrompt: "",
-        styleNegPrompt: ""
+        styleNegPrompt: "",
+        seedLocked: false,
+        lockedSeed: -1,
+        autoRemoveBg: false,
+        removeBgThreshold: 240
     },
 
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
@@ -512,11 +517,29 @@ async function extractImageFromNaiZip(arrayBuffer) {
     throw new Error(`NAI ZIP: 지원하지 않는 압축 방식 (method=${compressionMethod})`);
 }
 
+async function removeWhiteBackground(blob, threshold = 240) {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+        if (d[i] >= threshold && d[i + 1] >= threshold && d[i + 2] >= threshold) {
+            d[i + 3] = 0;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return await canvas.convertToBlob({ type: "image/png" });
+}
+
 async function callNovelAI(prompt, negativePrompt, config) {
     if (!config.apiKey) throw new Error("NAI API 키가 비어있음");
 
     const url = "https://image.novelai.net/ai/generate-image";
-    const seed = Math.floor(Math.random() * 4294967295);
+    const seed = (config.seedLocked && config.lockedSeed >= 0)
+        ? config.lockedSeed
+        : Math.floor(Math.random() * 4294967295);
 
     const body = {
         input: prompt,
@@ -527,6 +550,7 @@ async function callNovelAI(prompt, negativePrompt, config) {
             width: config.width || 832,
             height: config.height || 1216,
             scale: config.scale || 5,
+            cfg_rescale: config.cfgRescale ?? 0,
             sampler: config.sampler || "k_euler_ancestral",
             steps: config.steps || 28,
             seed: seed,
@@ -636,7 +660,11 @@ async function generateSpriteForLabel(charName, label) {
         const { prompt, negativePrompt } = buildNaiPrompt(charName, label);
         if (!prompt) throw new Error("베이스 프롬프트를 먼저 입력하세요.");
         const blob = await callNovelAIWithRetry(prompt, negativePrompt, extension_settings[extensionName].naiConfig);
-        const file = new File([blob], `${label}.png`, { type: "image/png" });
+        const naiCfg = extension_settings[extensionName].naiConfig;
+        const finalBlob = naiCfg.autoRemoveBg
+            ? await removeWhiteBackground(blob, naiCfg.removeBgThreshold ?? 240)
+            : blob;
+        const file = new File([finalBlob], `${label}.png`, { type: "image/png" });
         await addEmotion(file, label, charName);
         return true;
     } catch (err) {
@@ -1722,6 +1750,31 @@ function createSettingsPanel() {
                         <input id="ds-nai-scale" type="range" min="1" max="10" step="0.5"
                             value="${settings.naiConfig?.scale ?? 5}" class="ds-slider">
 
+                        <label>Prompt Guidance Rescale — <span id="ds-nai-rescale-val">${settings.naiConfig?.cfgRescale ?? 0}</span></label>
+                        <input id="ds-nai-rescale" type="range" min="0" max="1" step="0.05"
+                            value="${settings.naiConfig?.cfgRescale ?? 0}" class="ds-slider">
+
+                        <label class="checkbox_label" style="margin-top:8px;">
+                            <input id="ds-nai-seed-lock" type="checkbox" ${settings.naiConfig?.seedLocked ? "checked" : ""}>
+                            <span>시드 고정 (일관된 캐릭터 표정 세트)</span>
+                        </label>
+                        <div id="ds-nai-seed-row" style="display:${settings.naiConfig?.seedLocked ? "flex" : "none"}; gap:6px; margin-top:4px; align-items:center;">
+                            <input type="number" id="ds-nai-locked-seed" class="text_pole"
+                                value="${settings.naiConfig?.lockedSeed ?? -1}" min="-1" max="4294967295"
+                                placeholder="-1 (자동)" style="flex:1;">
+                            <button id="ds-nai-seed-random" class="menu_button" title="랜덤 시드 생성">🎲</button>
+                        </div>
+
+                        <label class="checkbox_label" style="margin-top:8px;">
+                            <input id="ds-nai-auto-bg" type="checkbox" ${settings.naiConfig?.autoRemoveBg ? "checked" : ""}>
+                            <span>배경 제거 (흰 배경 투명화)</span>
+                        </label>
+                        <div id="ds-nai-bg-row" style="display:${settings.naiConfig?.autoRemoveBg ? "block" : "none"}; margin-top:4px;">
+                            <label>임계값 — <span id="ds-nai-bg-thresh-val">${settings.naiConfig?.removeBgThreshold ?? 240}</span></label>
+                            <input id="ds-nai-bg-thresh" type="range" min="200" max="255" step="1"
+                                value="${settings.naiConfig?.removeBgThreshold ?? 240}" class="ds-slider">
+                        </div>
+
                         <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
                         <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
 
@@ -2565,6 +2618,53 @@ function createSettingsPanel() {
     $("#ds-nai-style-neg").on("change", function () {
         settings.naiConfig = settings.naiConfig || {};
         settings.naiConfig.styleNegPrompt = this.value.trim();
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-rescale")?.addEventListener("input", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.cfgRescale = parseFloat(this.value);
+        const lbl = document.getElementById("ds-nai-rescale-val");
+        if (lbl) lbl.textContent = this.value;
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-seed-lock")?.addEventListener("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.seedLocked = this.checked;
+        const row = document.getElementById("ds-nai-seed-row");
+        if (row) row.style.display = this.checked ? "flex" : "none";
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-locked-seed")?.addEventListener("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.lockedSeed = parseInt(this.value) || -1;
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-seed-random")?.addEventListener("click", function () {
+        const newSeed = Math.floor(Math.random() * 4294967295);
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.lockedSeed = newSeed;
+        const input = document.getElementById("ds-nai-locked-seed");
+        if (input) input.value = newSeed;
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-auto-bg")?.addEventListener("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.autoRemoveBg = this.checked;
+        const row = document.getElementById("ds-nai-bg-row");
+        if (row) row.style.display = this.checked ? "block" : "none";
+        saveSettingsDebounced();
+    });
+
+    document.getElementById("ds-nai-bg-thresh")?.addEventListener("input", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.removeBgThreshold = parseInt(this.value);
+        const lbl = document.getElementById("ds-nai-bg-thresh-val");
+        if (lbl) lbl.textContent = this.value;
         saveSettingsDebounced();
     });
 
