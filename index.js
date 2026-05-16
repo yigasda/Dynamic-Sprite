@@ -71,7 +71,9 @@ const defaultSettings = {
         height: 1216,
         steps: 28,
         scale: 5,
-        sampler: "k_euler_ancestral"
+        sampler: "k_euler_ancestral",
+        stylePrompt: "",
+        styleNegPrompt: ""
     },
 
     // 캐릭터별 감정 데이터 + 아코디언 펼침 상태
@@ -608,14 +610,18 @@ const DEFAULT_LABEL_PROMPTS = {
 };
 
 function buildNaiPrompt(charName, label) {
+    const cfg = extension_settings[extensionName];
     const charData = getCharData(charName);
     const naiGen = charData.naiGen || {};
-    const base = (naiGen.basePrompt || "").trim();
+    const style    = (cfg.naiConfig?.stylePrompt  || "").trim();
+    const base     = (naiGen.basePrompt || "").trim();
     const labelExtra = (naiGen.labelPrompts?.[label] || DEFAULT_LABEL_PROMPTS[label] || label).trim();
-    const neg = (naiGen.negativePrompt || "").trim()
-        || "lowres, bad anatomy, bad hands, text, error, extra digit, fewer digits, worst quality, low quality";
-    const parts = [base, labelExtra, "masterpiece, best quality"].filter(Boolean);
-    return { prompt: parts.join(", "), negativePrompt: neg };
+    const styleNeg = (cfg.naiConfig?.styleNegPrompt || "").trim();
+    const charNeg  = (naiGen.negativePrompt || "").trim();
+    const defaultNeg = "lowres, bad anatomy, bad hands, text, error, extra digit, worst quality, low quality";
+    const parts = [style, base, labelExtra].filter(Boolean);
+    const negParts = [styleNeg, charNeg || defaultNeg].filter(Boolean);
+    return { prompt: parts.join(", "), negativePrompt: negParts.join(", ") };
 }
 
 let naiGenerating = false;
@@ -1708,19 +1714,48 @@ function createSettingsPanel() {
                             <option value="512x768">512×768 (작게)</option>
                         </select>
 
+                        <label>스텝 — <span id="ds-nai-steps-val">${settings.naiConfig?.steps ?? 28}</span></label>
+                        <input id="ds-nai-steps" type="range" min="20" max="50" step="1"
+                            value="${settings.naiConfig?.steps ?? 28}" class="ds-slider">
+
+                        <label>프롬프트 가이던스 — <span id="ds-nai-scale-val">${settings.naiConfig?.scale ?? 5}</span></label>
+                        <input id="ds-nai-scale" type="range" min="1" max="10" step="0.5"
+                            value="${settings.naiConfig?.scale ?? 5}" class="ds-slider">
+
                         <button id="ds-nai-test" class="menu_button" style="margin-top:10px;">NAI 연결 테스트 (1장 생성)</button>
                         <div id="ds-nai-test-result" style="margin-top:8px; font-size:0.88em;"></div>
 
                         <hr>
 
+                        <label>그림체 긍정 프롬프트</label>
+                        <p class="ds-hint">화풍/품질 태그. 모든 생성에 앞에 붙음.</p>
+                        <textarea id="ds-nai-style-prompt" class="text_pole" rows="2"
+                            placeholder="masterpiece, best quality, anime style, ...">${settings.naiConfig?.stylePrompt ?? ""}</textarea>
+
+                        <label>그림체 네거티브 프롬프트</label>
+                        <textarea id="ds-nai-style-neg" class="text_pole" rows="2"
+                            placeholder="worst quality, lowres, ...">${settings.naiConfig?.styleNegPrompt ?? ""}</textarea>
+
+                        <hr>
+
                         <label>현재 캐릭터 베이스 프롬프트</label>
-                        <p class="ds-hint">캐릭터 고정 외모/의상. 예: <code>1girl, white hair, blue eyes, school uniform</code></p>
+                        <p class="ds-hint">캐릭터 고정 외모/의상. 예: <code>1girl, white hair, blue eyes</code></p>
                         <textarea id="ds-nai-base-prompt" class="text_pole" rows="3"
                             placeholder="1girl, ..."></textarea>
 
-                        <label>네거티브 프롬프트</label>
+                        <label>캐릭터 네거티브 프롬프트</label>
                         <textarea id="ds-nai-neg-prompt" class="text_pole" rows="2"
-                            placeholder="lowres, bad anatomy, ... (비워두면 기본값 사용)"></textarea>
+                            placeholder="(비워두면 기본값 사용)"></textarea>
+
+                        <hr>
+
+                        <label>단일 생성</label>
+                        <div style="display:flex; gap:6px;">
+                            <input type="text" id="ds-nai-quick-label" class="text_pole"
+                                placeholder="라벨명 (예: smile)" style="flex:1;">
+                            <button id="ds-nai-quick-gen" class="menu_button">🎨 생성</button>
+                        </div>
+                        <div id="ds-nai-quick-result" style="margin-top:6px; font-size:0.85em; min-height:14px;"></div>
 
                         <hr>
 
@@ -2501,6 +2536,61 @@ function createSettingsPanel() {
         const sizeSelect = document.getElementById("ds-nai-size");
         if (sizeSelect) sizeSelect.value = sizeStr;
     }
+
+    // 스텝 슬라이더
+    document.getElementById("ds-nai-steps")?.addEventListener("input", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.steps = parseInt(this.value);
+        const lbl = document.getElementById("ds-nai-steps-val");
+        if (lbl) lbl.textContent = this.value;
+        saveSettingsDebounced();
+    });
+
+    // 가이던스 슬라이더
+    document.getElementById("ds-nai-scale")?.addEventListener("input", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.scale = parseFloat(this.value);
+        const lbl = document.getElementById("ds-nai-scale-val");
+        if (lbl) lbl.textContent = this.value;
+        saveSettingsDebounced();
+    });
+
+    // 그림체 프롬프트
+    $("#ds-nai-style-prompt").on("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.stylePrompt = this.value.trim();
+        saveSettingsDebounced();
+    });
+
+    $("#ds-nai-style-neg").on("change", function () {
+        settings.naiConfig = settings.naiConfig || {};
+        settings.naiConfig.styleNegPrompt = this.value.trim();
+        saveSettingsDebounced();
+    });
+
+    // 단일 빠른 생성
+    $("#ds-nai-quick-gen").on("click", async function () {
+        const label = document.getElementById("ds-nai-quick-label")?.value.trim();
+        const resultEl = document.getElementById("ds-nai-quick-result");
+        if (!label) { toastr.warning("라벨명을 입력하세요."); return; }
+        if (!settings.naiConfig?.apiKey) { toastr.warning("NAI API 키를 먼저 설정해주세요."); return; }
+        const charName = getCurrentCharName();
+        if (!charName) { toastr.warning("캐릭터를 선택하세요."); return; }
+        this.disabled = true;
+        if (resultEl) resultEl.textContent = "⏳ 생성 중...";
+        try {
+            await generateSpriteForLabel(charName, label);
+            renderEmotionList();
+            renderNaiLabelPrompts(charName);
+            if (resultEl) resultEl.textContent = `✅ "${label}" 생성 완료`;
+            toastr.success(`"${label}" 생성 완료`);
+        } catch (err) {
+            if (resultEl) resultEl.textContent = `❌ ${err.message}`;
+            toastr.error(`생성 실패: ${err.message}`);
+        } finally {
+            this.disabled = false;
+        }
+    });
 
     $("#ds-nai-test").on("click", async function () {
         const resultEl = $("#ds-nai-test-result");
