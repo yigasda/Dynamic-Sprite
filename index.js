@@ -2184,7 +2184,11 @@ jQuery(async () => {
             _listEl.addEventListener("touchstart", e => {
                 _touchStartY = e.touches[0].clientY;
                 _scrollStartTop = _listEl.scrollTop;
-            }, { passive: true });
+                if (_listEl.scrollHeight > _listEl.clientHeight) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            }, { passive: false, capture: true });
             _listEl.addEventListener("touchmove", e => {
                 const dy = _touchStartY - e.touches[0].clientY;
                 const newTop = _scrollStartTop + dy;

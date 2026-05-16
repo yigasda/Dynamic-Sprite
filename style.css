@@ -299,7 +299,7 @@
     max-height: 600px;
     overflow-y: scroll;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    touch-action: none;
     overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(150, 150, 150, 0.5) transparent;
