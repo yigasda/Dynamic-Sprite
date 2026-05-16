@@ -563,6 +563,24 @@ async function callNovelAI(prompt, negativePrompt, config) {
     return await extractImageFromNaiZip(arrayBuffer);
 }
 
+async function callNovelAIWithRetry(prompt, negativePrompt, config, { maxRetries = 4, baseDelay = 8000 } = {}) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await callNovelAI(prompt, negativePrompt, config);
+        } catch (err) {
+            const is429 = err.message.includes("429");
+            if (is429 && attempt < maxRetries) {
+                const wait = baseDelay * (attempt + 1); // 8s, 16s, 24s, 32s
+                console.log(`[NAI] 429 — ${wait / 1000}초 후 재시도 (${attempt + 1}/${maxRetries})`);
+                toastr.info(`NAI 락 — ${wait / 1000}초 후 재시도 (${attempt + 1}/${maxRetries})`, "", { timeOut: wait });
+                await new Promise(r => setTimeout(r, wait));
+            } else {
+                throw err;
+            }
+        }
+    }
+}
+
 // ====================================================================
 // NAI 표정 생성 유틸
 // ====================================================================
@@ -611,7 +629,7 @@ async function generateSpriteForLabel(charName, label) {
     try {
         const { prompt, negativePrompt } = buildNaiPrompt(charName, label);
         if (!prompt) throw new Error("베이스 프롬프트를 먼저 입력하세요.");
-        const blob = await callNovelAI(prompt, negativePrompt, settings.naiConfig);
+        const blob = await callNovelAIWithRetry(prompt, negativePrompt, settings.naiConfig);
         const file = new File([blob], `${label}.png`, { type: "image/png" });
         await addEmotion(file, label, charName);
         return true;
@@ -640,7 +658,7 @@ async function generateAllSprites(charName, onProgress) {
         } catch (err) {
             results.failed.push({ label, error: err.message });
         }
-        if (i < labels.length - 1) await new Promise(r => setTimeout(r, 1000));
+        if (i < labels.length - 1) await new Promise(r => setTimeout(r, 3000));
     }
     onProgress?.(labels.length, labels.length, null);
     return results;
