@@ -11,6 +11,7 @@ const defaultSettings = {
     showSprite: true,
     transitionDuration: 300,
     customPrompt: "",
+    relationContext: "",
 
     // API 모드: 'st' | 'st_profile' | 'gemini' | 'openai_compat'
     apiMode: "st",
@@ -355,16 +356,21 @@ async function updateSprite(emotionLabel) {
 // ====================================================================
 // 프롬프트 빌더 - 캐릭터명 미포함 (배포용)
 // ====================================================================
-function buildEmotionPrompt(messageText, charData, customInstruction) {
+function buildEmotionPrompt(messageText, charData, customInstruction, relationContext) {
     const emotionDescriptions = charData.emotions.map(e => {
         return e.description?.trim()
             ? `- ${e.label}: ${e.description}`
             : `- ${e.label}`;
     }).join("\n");
 
+    const contextBlock = [
+        customInstruction ? `성격/분석 지침:\n${customInstruction}` : "",
+        relationContext   ? `유저와의 관계:\n${relationContext}` : "",
+    ].filter(Boolean).join("\n\n");
+
     return `[System Task: Emotion Classification]
 
-You are classifying the dominant emotion shown by a character in a roleplay response. Read the text carefully and identify what the CHARACTER is feeling (not the narrator, not the user).
+You are classifying the dominant emotion shown by a character in a roleplay response. Read the text carefully and identify what the CHARACTER is INTERNALLY feeling — not what they say, not what the user is doing.
 
 [Character's response]
 ${messageText}
@@ -372,7 +378,7 @@ ${messageText}
 [Available emotion labels - choose ONE]
 ${emotionDescriptions}
 
-${customInstruction ? `[Character traits / additional instructions]\n${customInstruction}\n\n` : ""}[Classification guidelines]
+${contextBlock ? `[Character traits / context]\n${contextBlock}\n\n` : ""}[Classification guidelines]
 - Default to "neutral" for ordinary conversation, small talk, factual statements, or mild responses without clear emotional signals. Most everyday dialogue is neutral.
 - Only pick a strong emotion (positive OR negative) when the text contains clear, explicit signals: emotional words, tone markers, body language descriptions, or unmistakable context.
 - Treat positive and negative emotions with equal weight. Do NOT default toward negative labels (guarded, contempt, aloof, tired, etc.) just because the tone is calm or reserved. Calm ≠ negative.
@@ -380,6 +386,7 @@ ${customInstruction ? `[Character traits / additional instructions]\n${customIns
 - "smile", "amused", "happy" require explicit positive signals — warmth, laughter, fondness, playfulness, soft tone toward the other person.
 - If the character is making casual conversation, asking questions, or giving information without emotional charge → "neutral".
 - If genuinely ambiguous between two emotions, prefer the milder/more neutral one.
+- Do NOT assign a label just because that word appears in the text. e.g. "you're laughing at me" or "I hate it when you do that (jokingly)" — the character is not necessarily laughing or angry. Focus on the character's own internal state.
 - Output ONLY the label name. No quotes, no markdown, no explanation, no punctuation.
 
 Label:`;
@@ -899,7 +906,9 @@ async function analyzeEmotion(messageText) {
     }
 
     const prompt = buildEmotionPrompt(
-        messageText, charData, settings.customPrompt?.trim() || ""
+        messageText, charData,
+        settings.customPrompt?.trim() || "",
+        settings.relationContext?.trim() || ""
     );
 
     try {
@@ -1950,8 +1959,14 @@ function createSettingsPanel() {
 
                 <div class="ds-section">
                     <h4>🧠 캐릭터 성격 / 분석 지침</h4>
+                    <p class="ds-hint" style="font-size:0.85em;color:#aaa;margin-bottom:6px;">캐릭터의 표현 방식을 설명하면 감정 분류 정확도가 올라갑니다.<br>예: "이 캐릭터는 무뚝뚝하게 말해도 화난 게 아님. 명확한 신호 없으면 neutral 우선"</p>
                     <textarea id="ds-custom-prompt" class="text_pole" rows="3"
                         placeholder="예: 이 character는 무뚝뚝하고 감정 표현을 절제하는 성격. 명확한 신호 없을 때는 neutral 우선.">${settings.customPrompt || ""}</textarea>
+
+                    <label style="font-size:0.88em;color:#aaa;display:block;margin:12px 0 4px;">💬 유저와의 관계 / 맥락 <span style="opacity:.6;">(선택)</span></label>
+                    <p class="ds-hint" style="font-size:0.85em;color:#aaa;margin-bottom:6px;">둘의 관계나 대화 분위기를 적으면 맥락을 반영한 분류가 됩니다.<br>예: "둘은 오랜 친구. 퉁명스럽거나 '넌 진짜' 같은 말도 장난일 수 있음"</p>
+                    <textarea id="ds-relation-context" class="text_pole" rows="2"
+                        placeholder="예: 캐릭터와 유저는 연인. 날카로운 말투도 애정 표현일 수 있음.">${settings.relationContext || ""}</textarea>
                 </div>
 
                 <hr>
@@ -2357,6 +2372,11 @@ function createSettingsPanel() {
 
     $("#ds-custom-prompt").on("change", function () {
         settings.customPrompt = this.value;
+        saveSettingsDebounced();
+    });
+
+    $("#ds-relation-context").on("change", function () {
+        settings.relationContext = this.value;
         saveSettingsDebounced();
     });
 
