@@ -1361,7 +1361,7 @@ function renderEmotionList() {
 
     const settings = extension_settings[extensionName];
     const allChars = Object.keys(settings.characters).filter(name => {
-        const cd = settings.characters[name];
+        const cd = getCharData(name); // 마이그레이션 트리거
         return cd.presets && Object.values(cd.presets).some(p => p.emotions.length > 0);
     });
 
@@ -1387,7 +1387,7 @@ function renderEmotionList() {
     listEl.innerHTML = "";
 
     sortedChars.forEach(charName => {
-        const charData = settings.characters[charName];
+        const charData = getCharData(charName); // 마이그레이션 보장
         const isExpanded = settings.expandedChars[charName] || charName === currentChar;
         const isCurrent = charName === currentChar;
 
