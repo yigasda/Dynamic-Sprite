@@ -411,6 +411,50 @@
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* ── 프리셋 탭 바 ── */
+.ds-preset-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 4px;
+}
+.ds-preset-tab {
+    padding: 2px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.55);
+    font-size: 0.82em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.ds-preset-tab-active {
+    background: rgba(183,148,210,0.25);
+    border-color: rgba(183,148,210,0.5);
+    color: #e8d8ff;
+}
+.ds-preset-del {
+    opacity: 0.5;
+    font-size: 0.9em;
+    margin-left: 2px;
+    line-height: 1;
+}
+.ds-preset-del:hover { opacity: 1; color: #f08080; }
+.ds-preset-add {
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.2);
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.82em;
+    cursor: pointer;
+}
+.ds-preset-add:hover { color: #e8d8ff; border-color: rgba(183,148,210,0.5); }
+
 /* ====================================================================
    감정 카드
 ==================================================================== */

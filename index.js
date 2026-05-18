@@ -172,9 +172,26 @@ function getCurrentCharName() {
 function getCharData(charName) {
     const settings = extension_settings[extensionName];
     if (!settings.characters[charName]) {
-        settings.characters[charName] = { emotions: [], current: null };
+        settings.characters[charName] = {
+            presets: { "기본": { emotions: [], current: null } },
+            activePreset: "기본",
+        };
     }
-    return settings.characters[charName];
+    const charData = settings.characters[charName];
+    // Migration: old format { emotions[], current, naiGen } → preset format
+    if (Array.isArray(charData.emotions)) {
+        charData.presets = { "기본": { emotions: charData.emotions, current: charData.current ?? null } };
+        charData.activePreset = "기본";
+        delete charData.emotions;
+        delete charData.current;
+    }
+    return charData;
+}
+
+function getActivePreset(charName) {
+    const charData = getCharData(charName);
+    return charData.presets[charData.activePreset]
+        || charData.presets[Object.keys(charData.presets)[0]];
 }
 
 // ====================================================================
@@ -274,9 +291,10 @@ async function updateSprite(emotionLabel) {
     if (!charName) return;
 
     const charData = getCharData(charName);
+    const preset = getActivePreset(charName);
     // 정확 매칭만 — 없으면 neutral fallback, 그것도 없으면 변경 안 함
-    const emotion = charData.emotions.find(e => e.label === emotionLabel)
-        || charData.emotions.find(e => e.label.toLowerCase() === "neutral");
+    const emotion = preset.emotions.find(e => e.label === emotionLabel)
+        || preset.emotions.find(e => e.label.toLowerCase() === "neutral");
     if (!emotion) {
         console.warn(`[DynamicSprite] "${emotionLabel}" 매칭 실패, 스프라이트 유지`);
         return;
@@ -343,7 +361,7 @@ async function updateSprite(emotionLabel) {
             }, settings.transitionDuration);
         }
 
-        charData.current = emotion.label;
+        preset.current = emotion.label;
         // 사용 횟수 카운트 (자동/수동 모두)
         emotion.usageCount = (emotion.usageCount || 0) + 1;
         emotion.lastUsedAt = Date.now();
@@ -725,12 +743,12 @@ async function generateSpriteForLabel(charName, label) {
 }
 
 async function generateAllSprites(charName, onProgress) {
-    const charData = getCharData(charName);
-    if (charData.emotions.length === 0) {
+    const preset = getActivePreset(charName);
+    if (preset.emotions.length === 0) {
         toastr.warning("생성할 라벨이 없습니다. 먼저 감정 라벨을 등록하세요.");
         return null;
     }
-    const labels = charData.emotions.map(e => e.label);
+    const labels = preset.emotions.map(e => e.label);
     const results = { success: [], failed: [] };
     for (let i = 0; i < labels.length; i++) {
         const label = labels[i];
@@ -752,12 +770,13 @@ function renderNaiLabelPrompts(charName) {
     if (!container) return;
     const charData = getCharData(charName);
     const labelPrompts = charData.naiGen?.labelPrompts || {};
+    const naiPreset = getActivePreset(charName);
 
-    if (charData.emotions.length === 0) {
+    if (naiPreset.emotions.length === 0) {
         container.innerHTML = `<div class="ds-hint">등록된 감정 라벨 없음</div>`;
         return;
     }
-    container.innerHTML = charData.emotions.map(e => `
+    container.innerHTML = naiPreset.emotions.map(e => `
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
             <span style="min-width:80px; font-size:0.85em; flex-shrink:0;">${e.label}</span>
             <input type="text" class="text_pole ds-nai-lp-input" data-label="${e.label}"
@@ -892,13 +911,14 @@ async function analyzeEmotion(messageText) {
     if (!charName) return null;
 
     const charData = getCharData(charName);
-    if (charData.emotions.length === 0) return null;
+    const preset = getActivePreset(charName);
+    if (preset.emotions.length === 0) return null;
 
     // 캐시 확인
     const cached = cacheGet(charName, messageText);
     if (cached) {
         // 캐시에 있는 라벨이 아직 등록된 라벨인지도 확인
-        const stillExists = charData.emotions.some(e => e.label === cached);
+        const stillExists = preset.emotions.some(e => e.label === cached);
         if (stillExists) {
             console.log(`[DynamicSprite] (cache) → ${cached}`);
             return cached;
@@ -906,7 +926,7 @@ async function analyzeEmotion(messageText) {
     }
 
     const prompt = buildEmotionPrompt(
-        messageText, charData,
+        messageText, preset,
         settings.customPrompt?.trim() || "",
         settings.relationContext?.trim() || ""
     );
@@ -936,17 +956,17 @@ async function analyzeEmotion(messageText) {
         const cleaned = rawText.toLowerCase().replace(/[*_`"'.\s,!?]+/g, "");
 
         // 1차: 정확 매칭
-        let matched = charData.emotions.find(e => e.label.toLowerCase() === cleaned);
+        let matched = preset.emotions.find(e => e.label.toLowerCase() === cleaned);
 
         // 2차: 첫 단어만 추출 후 매칭 (LLM이 가끔 문장 뱉는 경우)
         if (!matched) {
             const firstWord = rawText.split(/[\s,.\n]+/)[0].toLowerCase().replace(/[*_`"'.,!?]/g, "");
-            matched = charData.emotions.find(e => e.label.toLowerCase() === firstWord);
+            matched = preset.emotions.find(e => e.label.toLowerCase() === firstWord);
         }
 
         // 3차: 부분 매칭 (라벨이 텍스트에 정확히 포함)
         if (!matched) {
-            matched = charData.emotions.find(e => {
+            matched = preset.emotions.find(e => {
                 const labelLower = e.label.toLowerCase();
                 const regex = new RegExp(`\\b${labelLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
                 return regex.test(rawText.toLowerCase());
@@ -964,7 +984,7 @@ async function analyzeEmotion(messageText) {
                 if (regex.test(lowerText)) {
                     const canonical = aliases[aliasWord];
                     // canonical 라벨로 등록된 감정 있나 확인
-                    matched = charData.emotions.find(e => e.label.toLowerCase() === canonical);
+                    matched = preset.emotions.find(e => e.label.toLowerCase() === canonical);
                     if (matched) {
                         console.log(`[DynamicSprite] alias 매핑: "${aliasWord}" → "${canonical}"`);
                         break;
@@ -972,7 +992,7 @@ async function analyzeEmotion(messageText) {
                     // canonical 없으면 그 단어가 가리키는 같은 그룹의 다른 alias도 시도
                     for (const w in aliases) {
                         if (aliases[w] === canonical && w !== aliasWord) {
-                            matched = charData.emotions.find(e => e.label.toLowerCase() === w);
+                            matched = preset.emotions.find(e => e.label.toLowerCase() === w);
                             if (matched) {
                                 console.log(`[DynamicSprite] alias 그룹 매핑: "${aliasWord}" → "${w}"`);
                                 break;
@@ -1148,6 +1168,7 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
 
     const settings = extension_settings[extensionName];
     const charData = getCharData(charName);
+    const preset = getActivePreset(charName);
     const label = customLabel || extractEmotionFromFilename(file.name);
 
     // 자동 압축 적용
@@ -1163,12 +1184,12 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
         }
     }
 
-    const existing = charData.emotions.find(e => e.label === label);
+    const existing = preset.emotions.find(e => e.label === label);
     if (existing) {
         // 폴더 일괄 등록 시엔 confirm 생략, 자동 덮어쓰기
         await deleteImage(existing.imageKey);
         if (settings.imageBackup) delete settings.imageBackup[existing.imageKey];
-        charData.emotions = charData.emotions.filter(e => e.label !== label);
+        preset.emotions = preset.emotions.filter(e => e.label !== label);
     }
 
     const imageKey = `${charName}__${label}__${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1185,7 +1206,7 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
         }
     }
 
-    charData.emotions.push({
+    preset.emotions.push({
         label, imageKey, description: "", addedAt: Date.now(),
         usageCount: 0
     });
@@ -1200,10 +1221,12 @@ async function addEmotion(file, customLabel = null, targetCharName = null) {
 async function deleteAllEmotionsForChar(charName) {
     const settings = extension_settings[extensionName];
     const charData = settings.characters[charName];
-    if (!charData || charData.emotions.length === 0) return 0;
+    if (!charData) return 0;
+    const preset = getActivePreset(charName);
+    if (!preset || preset.emotions.length === 0) return 0;
 
-    const count = charData.emotions.length;
-    for (const emotion of charData.emotions) {
+    const count = preset.emotions.length;
+    for (const emotion of preset.emotions) {
         try {
             await deleteImage(emotion.imageKey);
             if (settings.imageBackup) delete settings.imageBackup[emotion.imageKey];
@@ -1211,8 +1234,8 @@ async function deleteAllEmotionsForChar(charName) {
             console.warn(`[DynamicSprite] 삭제 실패: ${emotion.imageKey}`, err);
         }
     }
-    charData.emotions = [];
-    charData.current = null;
+    preset.emotions = [];
+    preset.current = null;
     saveSettingsDebounced();
     return count;
 }
@@ -1224,9 +1247,17 @@ async function deleteAllEmotionsEverywhere() {
     const settings = extension_settings[extensionName];
     let total = 0;
     for (const charName in settings.characters) {
-        total += await deleteAllEmotionsForChar(charName);
+        const cd = settings.characters[charName];
+        for (const pName in cd.presets || {}) {
+            for (const emotion of cd.presets[pName].emotions) {
+                try {
+                    await deleteImage(emotion.imageKey);
+                    if (settings.imageBackup) delete settings.imageBackup[emotion.imageKey];
+                    total++;
+                } catch {}
+            }
+        }
     }
-    // 메모리 정리
     settings.characters = {};
     settings.imageBackup = {};
     saveSettingsDebounced();
@@ -1244,8 +1275,11 @@ async function autoRestoreFromBackup() {
     // 등록된 imageKey들 모음
     const expectedKeys = new Set();
     for (const charName in settings.characters) {
-        for (const emotion of settings.characters[charName].emotions) {
-            expectedKeys.add(emotion.imageKey);
+        const cd = settings.characters[charName];
+        for (const presetName in cd.presets || {}) {
+            for (const emotion of cd.presets[presetName].emotions) {
+                expectedKeys.add(emotion.imageKey);
+            }
         }
     }
     if (expectedKeys.size === 0) return 0;
@@ -1326,9 +1360,10 @@ function renderEmotionList() {
     if (!listEl) return;
 
     const settings = extension_settings[extensionName];
-    const allChars = Object.keys(settings.characters).filter(name =>
-        settings.characters[name].emotions.length > 0
-    );
+    const allChars = Object.keys(settings.characters).filter(name => {
+        const cd = settings.characters[name];
+        return cd.presets && Object.values(cd.presets).some(p => p.emotions.length > 0);
+    });
 
     const currentChar = getCurrentCharName();
 
@@ -1356,21 +1391,36 @@ function renderEmotionList() {
         const isExpanded = settings.expandedChars[charName] || charName === currentChar;
         const isCurrent = charName === currentChar;
 
+        const preset = getActivePreset(charName);
+        const presetNames = Object.keys(charData.presets);
+
         const accordion = document.createElement("div");
         accordion.className = `ds-char-accordion ${isCurrent ? "ds-current" : ""}`;
+
+        const presetTabsHtml = presetNames.map(pName => `
+            <button class="ds-preset-tab${pName === charData.activePreset ? " ds-preset-tab-active" : ""}"
+                data-char="${charName}" data-preset="${pName}">${pName}${presetNames.length > 1
+                    ? `<span class="ds-preset-del" data-char="${charName}" data-preset="${pName}">×</span>`
+                    : ""}</button>
+        `).join("");
 
         accordion.innerHTML = `
             <div class="ds-char-header" data-char="${charName}">
                 <span class="ds-char-toggle">${isExpanded ? "▼" : "▶"}</span>
                 <span class="ds-char-name">${isCurrent ? "🎯 " : ""}${charName}</span>
-                <span class="ds-char-count">${charData.emotions.length}개</span>
+                <span class="ds-char-count">${preset.emotions.length}개</span>
             </div>
-            <div class="ds-char-body" style="display:${isExpanded ? "block" : "none"};"></div>
+            <div class="ds-char-body" style="display:${isExpanded ? "block" : "none"};">
+                <div class="ds-preset-bar">
+                    ${presetTabsHtml}
+                    <button class="ds-preset-add" data-char="${charName}" title="새 프리셋">＋</button>
+                </div>
+            </div>
         `;
 
         const body = accordion.querySelector(".ds-char-body");
 
-        charData.emotions.forEach((emotion, idx) => {
+        preset.emotions.forEach((emotion, idx) => {
             const item = document.createElement("div");
             item.className = "ds-emotion-item";
             const usage = emotion.usageCount || 0;
@@ -1427,12 +1477,59 @@ function renderEmotionList() {
         });
     });
 
+    // 프리셋 탭 전환
+    listEl.querySelectorAll(".ds-preset-tab").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            if (e.target.classList.contains("ds-preset-del")) return;
+            const cn = e.currentTarget.dataset.char;
+            const pName = e.currentTarget.dataset.preset;
+            settings.characters[cn].activePreset = pName;
+            saveSettingsDebounced();
+            renderEmotionList();
+        });
+    });
+
+    // 프리셋 삭제 (× 버튼)
+    listEl.querySelectorAll(".ds-preset-del").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const cn = e.currentTarget.dataset.char;
+            const pName = e.currentTarget.dataset.preset;
+            const cd = settings.characters[cn];
+            if (Object.keys(cd.presets).length <= 1) return;
+            if (!confirm(`"${pName}" 프리셋과 감정 ${cd.presets[pName].emotions.length}개를 삭제할까요?`)) return;
+            for (const em of cd.presets[pName].emotions) {
+                deleteImage(em.imageKey).catch(() => {});
+                if (settings.imageBackup) delete settings.imageBackup[em.imageKey];
+            }
+            delete cd.presets[pName];
+            if (cd.activePreset === pName) cd.activePreset = Object.keys(cd.presets)[0];
+            saveSettingsDebounced();
+            renderEmotionList();
+        });
+    });
+
+    // 새 프리셋 추가
+    listEl.querySelectorAll(".ds-preset-add").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const cn = e.currentTarget.dataset.char;
+            const name = prompt("새 프리셋 이름:", "");
+            if (!name?.trim()) return;
+            const cd = settings.characters[cn];
+            if (cd.presets[name.trim()]) { alert("같은 이름이 이미 있습니다"); return; }
+            cd.presets[name.trim()] = { emotions: [], current: null };
+            cd.activePreset = name.trim();
+            saveSettingsDebounced();
+            renderEmotionList();
+        });
+    });
+
     // 라벨 수정
     listEl.querySelectorAll(".ds-emotion-label").forEach(input => {
         input.addEventListener("change", (e) => {
             const cn = e.target.dataset.char;
             const idx = parseInt(e.target.dataset.idx);
-            settings.characters[cn].emotions[idx].label = e.target.value.trim();
+            getActivePreset(cn).emotions[idx].label = e.target.value.trim();
             saveSettingsDebounced();
         });
     });
@@ -1442,7 +1539,7 @@ function renderEmotionList() {
         input.addEventListener("change", (e) => {
             const cn = e.target.dataset.char;
             const idx = parseInt(e.target.dataset.idx);
-            settings.characters[cn].emotions[idx].description = e.target.value.trim();
+            getActivePreset(cn).emotions[idx].description = e.target.value.trim();
             saveSettingsDebounced();
         });
     });
@@ -1456,7 +1553,7 @@ function renderEmotionList() {
                 .split(",")
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
-            settings.characters[cn].emotions[idx].groups = groups;
+            getActivePreset(cn).emotions[idx].groups = groups;
             saveSettingsDebounced();
         });
     });
@@ -1466,11 +1563,11 @@ function renderEmotionList() {
         btn.addEventListener("click", async (e) => {
             const cn = e.currentTarget.dataset.char;
             const idx = parseInt(e.currentTarget.dataset.idx);
-            const emotion = settings.characters[cn].emotions[idx];
+            const emotion = getActivePreset(cn).emotions[idx];
             if (!confirm(`"${emotion.label}" 감정을 삭제할까요?`)) return;
             await deleteImage(emotion.imageKey);
             if (settings.imageBackup) delete settings.imageBackup[emotion.imageKey];
-            settings.characters[cn].emotions.splice(idx, 1);
+            getActivePreset(cn).emotions.splice(idx, 1);
             saveSettingsDebounced();
             renderEmotionList();
         });
@@ -2223,18 +2320,22 @@ function createSettingsPanel() {
             return;
         }
         const charData = settings.characters[charName];
-        if (!charData || charData.emotions.length === 0) {
+        const activePreset = getActivePreset(charName);
+        if (!charData || activePreset.emotions.length === 0) {
             toastr.info(`"${charName}"에 등록된 감정이 없습니다`);
             return;
         }
-        if (!confirm(`"${charName}"의 감정 ${charData.emotions.length}개를 모두 삭제할까요? (이미지 파일과 백업까지 삭제)`)) return;
+        if (!confirm(`"${charName}"의 감정 ${activePreset.emotions.length}개를 모두 삭제할까요? (이미지 파일과 백업까지 삭제)`)) return;
         const count = await deleteAllEmotionsForChar(charName);
         renderEmotionList();
         toastr.success(`"${charName}"의 감정 ${count}개를 삭제했습니다`);
     });
 
     $("#ds-delete-all").on("click", async function () {
-        const charCount = Object.keys(settings.characters).filter(n => settings.characters[n].emotions.length > 0).length;
+        const charCount = Object.keys(settings.characters).filter(n => {
+            const cd = settings.characters[n];
+            return cd.presets && Object.values(cd.presets).some(p => p.emotions.length > 0);
+        }).length;
         if (charCount === 0) {
             toastr.info("삭제할 감정이 없습니다");
             return;
@@ -2275,17 +2376,18 @@ function createSettingsPanel() {
             return;
         }
         const charData = settings.characters[charName];
-        if (!charData || charData.emotions.length === 0) {
+        const statsPreset = getActivePreset(charName);
+        if (!charData || statsPreset.emotions.length === 0) {
             contentEl.innerHTML = `<div class="ds-hint">"${charName}"에 등록된 감정 없음</div>`;
             return;
         }
 
-        const totalUsage = charData.emotions.reduce((sum, e) => sum + (e.usageCount || 0), 0);
+        const totalUsage = statsPreset.emotions.reduce((sum, e) => sum + (e.usageCount || 0), 0);
 
         // 그룹별 통계
         const groupStats = {};
         const ungrouped = [];
-        for (const emotion of charData.emotions) {
+        for (const emotion of statsPreset.emotions) {
             const usage = emotion.usageCount || 0;
             const groups = Array.isArray(emotion.groups) && emotion.groups.length > 0 ? emotion.groups : null;
             if (groups) {
@@ -2300,13 +2402,13 @@ function createSettingsPanel() {
         }
 
         // 라벨별 정렬
-        const sortedEmotions = [...charData.emotions].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+        const sortedEmotions = [...statsPreset.emotions].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
         const top = sortedEmotions.slice(0, 5);
-        const unused = charData.emotions.filter(e => !e.usageCount).map(e => e.label);
+        const unused = statsPreset.emotions.filter(e => !e.usageCount).map(e => e.label);
 
         let html = `
             <div style="margin-bottom:8px; padding:8px; background:rgba(255,255,255,0.04); border-radius:6px;">
-                <b>${charName}</b> · 총 분석 ${totalUsage}회 · 등록 감정 ${charData.emotions.length}개
+                <b>${charName}</b> · 총 분석 ${totalUsage}회 · 등록 감정 ${statsPreset.emotions.length}개
             </div>
         `;
 
@@ -2354,8 +2456,11 @@ function createSettingsPanel() {
     $("#ds-stats-reset").on("click", function () {
         if (!confirm("모든 캐릭터의 사용 횟수를 0으로 초기화할까요?")) return;
         for (const cn in settings.characters) {
-            for (const e of settings.characters[cn].emotions) {
-                e.usageCount = 0;
+            const cd = settings.characters[cn];
+            for (const pName in cd.presets || {}) {
+                for (const e of cd.presets[pName].emotions) {
+                    e.usageCount = 0;
+                }
             }
         }
         saveSettingsDebounced();
@@ -2512,10 +2617,12 @@ function createSettingsPanel() {
         delete exportData.settings.apiKey;
 
         for (const charName in extension_settings[extensionName].characters) {
-            const charData = extension_settings[extensionName].characters[charName];
-            for (const emotion of charData.emotions) {
-                const blob = await loadImage(emotion.imageKey);
-                if (blob) exportData.images[emotion.imageKey] = await blobToBase64(blob);
+            const cd = extension_settings[extensionName].characters[charName];
+            for (const pName in cd.presets || {}) {
+                for (const emotion of cd.presets[pName].emotions) {
+                    const blob = await loadImage(emotion.imageKey);
+                    if (blob) exportData.images[emotion.imageKey] = await blobToBase64(blob);
+                }
             }
         }
 
@@ -2574,11 +2681,12 @@ function createSettingsPanel() {
 
             const charData = settings.characters[charName];
             const img = document.getElementById("dynamic-sprite-img");
+            const switchPreset = charData ? getActivePreset(charName) : null;
 
-            if (charData && charData.emotions.length > 0) {
-                const targetLabel = charData.current
-                    || charData.emotions.find(e => e.label.toLowerCase() === "neutral")?.label
-                    || charData.emotions[0].label;
+            if (switchPreset && switchPreset.emotions.length > 0) {
+                const targetLabel = switchPreset.current
+                    || switchPreset.emotions.find(e => e.label.toLowerCase() === "neutral")?.label
+                    || switchPreset.emotions[0].label;
                 await updateSprite(targetLabel);
             } else {
                 if (img) {
@@ -3000,7 +3108,8 @@ function showEmotionPickerPopup() {
         return;
     }
     const charData = getCharData(charName);
-    if (!charData.emotions || charData.emotions.length === 0) {
+    const pickerPreset = getActivePreset(charName);
+    if (!pickerPreset || pickerPreset.emotions.length === 0) {
         toastr.warning(`"${charName}"에 등록된 감정이 없습니다`);
         return;
     }
@@ -3020,8 +3129,8 @@ function showEmotionPickerPopup() {
             <button class="ds-picker-popup-close">✕</button>
         </div>
         <div class="ds-picker-popup-grid">
-            ${charData.emotions.map(e => `
-                <button class="ds-picker-popup-item ${e.label === charData.current ? "ds-picker-popup-current" : ""}" data-label="${e.label}">
+            ${pickerPreset.emotions.map(e => `
+                <button class="ds-picker-popup-item ${e.label === pickerPreset.current ? "ds-picker-popup-current" : ""}" data-label="${e.label}">
                     ${e.label}
                 </button>
             `).join("")}
